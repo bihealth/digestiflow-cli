@@ -1,0 +1,16 @@
+[package]
+name = "digestiflow-cli-client"
+version = "0.1.0"
+authors = ["Manuel Holtgrewe <manuel.holtgrewe@bihealth.de>"]
+
+[dependencies]
+# XPath-based access to XML
+sxd-xpath = "0.4.2"
+# Command line handling
+clap = "2"
+# Configuration management
+config = "0.9"
+# REST API client
+restson = "^0.4.1"
+serde = "^1.0"
+serde_derive = "^1.0"
