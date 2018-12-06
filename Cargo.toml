@@ -8,6 +8,7 @@ authors = ["Manuel Holtgrewe <manuel.holtgrewe@bihealth.de>"]
 error-chain = "0.9"
 # XPath-based access to XML
 sxd-xpath = "0.4.2"
+sxd-document = "0.3.0"
 # Command line handling
 clap = {version = "2", features = ["yaml"]}
 # Configuration management

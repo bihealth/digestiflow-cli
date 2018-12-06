@@ -3,29 +3,29 @@ use config::{Config, ConfigError, Environment, File};
 
 #[derive(Derivative, Deserialize)]
 #[derivative(Debug)]
-struct Web {
-    url: String,
+pub struct Web {
+    pub url: String,
     #[derivative(Debug = "ignore")]
-    key: String,
+    pub key: String,
 }
 
 #[derive(Debug, Deserialize)]
-struct IngestArgs {
-    path: Vec<String>,
-    register: bool,
-    update: bool,
-    analyze_adapters: bool,
-    post_adapters: bool,
+pub struct IngestArgs {
+    pub path: Vec<String>,
+    pub register: bool,
+    pub update: bool,
+    pub analyze_adapters: bool,
+    pub post_adapters: bool,
 }
 
 #[derive(Debug, Deserialize)]
 pub struct Settings {
-    debug: bool,
-    verbose: bool,
-    quiet: bool,
-    threads: i32,
-    web: Web,
-    ingest: IngestArgs,
+    pub debug: bool,
+    pub verbose: bool,
+    pub quiet: bool,
+    pub threads: i32,
+    pub web: Web,
+    pub ingest: IngestArgs,
 }
 
 impl Settings {

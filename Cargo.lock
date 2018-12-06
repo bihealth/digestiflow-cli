@@ -209,6 +209,7 @@ dependencies = [
  "slog 2.4.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "slog-async 2.3.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "slog-term 2.4.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "sxd-document 0.3.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "sxd-xpath 0.4.2 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 

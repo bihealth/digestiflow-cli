@@ -2,8 +2,12 @@
 #![recursion_limit = "1024"]
 
 #[macro_use]
-extern crate error_chain;
+extern crate clap;
 extern crate config;
+#[macro_use]
+extern crate derivative;
+#[macro_use]
+extern crate error_chain;
 extern crate serde;
 #[macro_use]
 extern crate serde_derive;
@@ -11,10 +15,8 @@ extern crate serde_derive;
 extern crate slog;
 extern crate slog_async;
 extern crate slog_term;
-#[macro_use]
-extern crate clap;
-#[macro_use]
-extern crate derivative;
+extern crate sxd_document;
+extern crate sxd_xpath;
 
 mod ingest;
 mod settings;
@@ -106,6 +108,8 @@ fn run(matches: ArgMatches) -> Result<()> {
         ).chain_err(|| "Could not execute 'ingest' command")?,
         _ => bail!("Invalid command: {}", matches.subcommand().0),
     }
+
+    info!(logger, "All done. Have a nice day.");
 
     Ok(())
 }
