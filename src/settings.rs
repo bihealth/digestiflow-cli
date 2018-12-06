@@ -18,6 +18,8 @@ pub struct IngestArgs {
     pub analyze_adapters: bool,
     pub post_adapters: bool,
     pub operator: String,
+    pub sample_tiles: i32,
+    pub sample_reads_per_tile: i32,
 }
 
 #[derive(Debug, Deserialize)]
@@ -63,11 +65,11 @@ impl Settings {
                         .map(|s| s.to_string())
                         .collect::<Vec<String>>(),
                 )?;
-                if m.is_present("register") {
-                    s.set("ingest.register", true)?;
+                if m.is_present("no_register") {
+                    s.set("ingest.register", false)?;
                 }
-                if m.is_present("update") {
-                    s.set("ingest.update", true)?;
+                if m.is_present("no_update") {
+                    s.set("ingest.update", false)?;
                 }
                 if m.is_present("analyze_adapters") {
                     s.set("ingest.analyze_adapters", true)?;

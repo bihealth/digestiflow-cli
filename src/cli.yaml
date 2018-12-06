@@ -50,23 +50,23 @@ subcommands:
         required: false
         value_name: PROJECT_UUID
         help: The UUID of the project to write to.
-    - register:
-        long: register
+    - no_register:
+        long: no-register
         takes_value: false
         required: false
         help: Whether or not to register flow cell via the API.
-    - update:
-        long: update
+    - no_update:
+        long: no-update
         takes_value: false
         required: false
         help: Whether or not to update the flow cell via the API
     - analyze_adapters:
-        long: analyze_adapters
+        long: analyze-adapters
         takes_value: false
         required: false
         help: Read adapters from binary base call files
     - post_adapters:
-        long: post_adapterss
+        long: post-adapterss
         takes_value: false
         required: false
         help: Post adapters to API if read

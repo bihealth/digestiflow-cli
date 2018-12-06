@@ -1,4 +1,9 @@
+use byteorder::{LittleEndian, ReadBytesExt};
+use flate2::read::GzDecoder;
+use glob::glob;
+use std::collections::HashMap;
 use std::fs::File;
+// use std::io;
 use std::io::prelude::*;
 use std::path::Path;
 use std::result;
@@ -82,7 +87,7 @@ impl<'a> RestPath<&'a ProjectFlowcellArgs> for DigestiflowFlowCell {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 enum FolderLayout {
     /// MiSeq, HiSeq 2000, etc. `runParameters.xml`
     MiSeq,
@@ -353,16 +358,12 @@ fn process_xml(
     Ok((run_info, run_params))
 }
 
-fn register_flowcell(
-    logger: &slog::Logger,
-    client: &mut RestClient,
+fn build_flow_cell(
     run_info: &RunInfo,
     run_params: &RunParameters,
     settings: &Settings,
-) -> Result<DigestiflowFlowCell> {
-    info!(logger, "Registering flow cell...");
-
-    let flowcell = DigestiflowFlowCell {
+) -> DigestiflowFlowCell {
+    DigestiflowFlowCell {
         sodar_uuid: None,
         run_date: run_info.date.clone(),
         run_number: run_info.run_number,
@@ -385,7 +386,19 @@ fn register_flowcell(
         status_conversion: "initial".to_string(),
         status_delivery: "initial".to_string(),
         delivery_type: "seq".to_string(),
-    };
+    }
+}
+
+fn register_flowcell(
+    logger: &slog::Logger,
+    client: &mut RestClient,
+    run_info: &RunInfo,
+    run_params: &RunParameters,
+    settings: &Settings,
+) -> Result<DigestiflowFlowCell> {
+    info!(logger, "Registering flow cell...");
+
+    let flowcell = build_flow_cell(run_info, run_params, settings);
     debug!(logger, "Registering flowcell as {:?}", &flowcell);
 
     let args = ProjectArgs {
@@ -399,6 +412,127 @@ fn register_flowcell(
     info!(logger, "Done registering flow cell.");
 
     Ok(flowcell)
+}
+
+// fn tile_paths(
+//     logger: &slog::Logger,
+//     folder_layout: FolderLayout,
+//     path: &Path,
+//     lane: i32,
+//     cycle: i32,
+// ) -> Vec<Path> {
+//     let tile_paths = Vec::new();
+//     debug!(
+//         logger,
+//         "Paths to tiles for lane {} and cycle {} are {}", lane, cycle, tile_paths
+//     );
+//     file_paths
+// }
+
+fn sample_adapters(
+    logger: &slog::Logger,
+    path: &Path,
+    desc: &ReadDescription,
+    folder_layout: FolderLayout,
+    settings: &Settings,
+    start_cycle: i32,
+) -> Result<()> {
+    // Helper table for building strings below.
+    let table: Vec<char> = vec!['A', 'C', 'G', 'T'];
+
+    match folder_layout {
+        FolderLayout::MiniSeq => {
+            let path = path
+                .join("Data")
+                .join("Intensities")
+                .join("BaseCalls")
+                .join("L???");
+            let lane_paths = glob(path.to_str().unwrap())
+                .expect("Failed to read glob pattern")
+                .map(|x| x.unwrap().to_str().unwrap().to_string())
+                .collect::<Vec<String>>();
+
+            for ref lane_path in &lane_paths {
+                info!(logger, "Considering lane path {}", &lane_path);
+                let mut reads: Vec<String> = Vec::new();
+
+                for cycle in start_cycle..(start_cycle + desc.num_cycles) {
+                    let cycle_path = Path::new(lane_path).join(format!("{:04}.bcl.bgzf", cycle));
+                    info!(
+                        logger,
+                        "Opening file {}",
+                        cycle_path.to_str().unwrap().to_string()
+                    );
+
+                    let mut file =
+                        File::open(&cycle_path).chain_err(|| "Problem opening gzip file")?;
+                    let mut gz_decoder = GzDecoder::new(file);
+                    // Read number of bytes in file.
+                    let mut buf = [0u32; 1];
+                    let num_bytes = gz_decoder
+                        .read_u32::<LittleEndian>()
+                        .chain_err(|| "Problem reading byte count")?
+                        as usize;
+                    // Allocate array of strings if necessary.
+                    if reads.is_empty() {
+                        reads.resize(num_bytes, String::new());
+                    }
+                    // Read array with bases and quality values.
+                    let mut buf = vec![0u8; num_bytes];
+                    gz_decoder
+                        .read(&mut buf[..])
+                        .chain_err(|| "Problem reading payload")?;
+                    // Strip quality from bases, set "N" where qualitiy is 0.
+                    for i in 0..num_bytes {
+                        if buf[i] == 0 {
+                            reads[i].push('N');
+                        } else {
+                            reads[i].push(table[(buf[i] & 3) as usize]);
+                        }
+                    }
+                }
+
+                let mut counter: HashMap<String, u64> = HashMap::new();
+                for read in &reads {
+                    *counter.entry(read.clone()).or_insert(1u64) += 1;
+                }
+
+                for (seq, count) in counter.iter() {
+                    if *count > 100 {
+                        println!("{}\t{}", seq, count);
+                    }
+                }
+            }
+        }
+        _ => bail!(
+            "Don't know yet how to process folder layout {:?}",
+            folder_layout
+        ),
+    };
+
+    Ok(())
+}
+
+fn analyze_adapters(
+    logger: &slog::Logger,
+    run_info: &RunInfo,
+    run_params: &RunParameters,
+    path: &Path,
+    folder_layout: FolderLayout,
+    settings: &Settings,
+) -> Result<()> {
+    info!(logger, "Analyzing adapters...");
+
+    let mut cycle = 0i32;
+    for ref desc in &run_info.reads {
+        if desc.is_index {
+            sample_adapters(logger, path, &desc, folder_layout, settings, cycle)?;
+        }
+        cycle += desc.num_cycles;
+    }
+
+    info!(logger, "Done analyzing adapters.");
+    Ok(())
 }
 
 fn process_folder(logger: &slog::Logger, path: &Path, settings: &Settings) -> Result<()> {
@@ -454,41 +588,62 @@ fn process_folder(logger: &slog::Logger, path: &Path, settings: &Settings) -> Re
     let (run_info, run_params) = process_xml(logger, path, folder_layout, &info_doc, &param_doc)?;
 
     // Try to get the flow cell information from API.
-    let mut client = RestClient::new(&settings.web.url).unwrap();
-    client
-        .set_header("Authorization", &format!("Token {}", &settings.web.token))
-        .chain_err(|| "Problem configuring REST client")?;
-    let result: result::Result<DigestiflowFlowCell, restson::Error> =
-        client.get(&ResolveFlowCellArgs {
-            project_uuid: settings.ingest.project_uuid.clone(),
-            instrument: run_info.instrument.clone(),
-            run_number: run_info.run_number,
-            flowcell: run_info.flowcell.clone(),
-        });
-    let flowcell: DigestiflowFlowCell = match result {
-        Ok(flowcell) => {
-            debug!(logger, "Flow cell found with value {:?}", &flowcell);
-            flowcell
-        }
-        Err(restson::Error::HttpError(404, _msg)) => {
-            debug!(logger, "Flow cell was not found!");
-            if settings.ingest.register {
-                let flowcell =
-                    register_flowcell(logger, &mut client, &run_info, &run_params, &settings)?;
-                debug!(logger, "Flow cell registered as {:?}", &flowcell);
+    if settings.ingest.register || settings.ingest.update {
+        let mut client = RestClient::new(&settings.web.url).unwrap();
+        client
+            .set_header("Authorization", &format!("Token {}", &settings.web.token))
+            .chain_err(|| "Problem configuring REST client")?;
+        let result: result::Result<DigestiflowFlowCell, restson::Error> =
+            client.get(&ResolveFlowCellArgs {
+                project_uuid: settings.ingest.project_uuid.clone(),
+                instrument: run_info.instrument.clone(),
+                run_number: run_info.run_number,
+                flowcell: run_info.flowcell.clone(),
+            });
+        // Update or create if necessary.
+        let flowcell: DigestiflowFlowCell = match result {
+            Ok(flowcell) => {
+                debug!(logger, "Flow cell found with value {:?}", &flowcell);
+                if settings.ingest.update {
+                    // TODO
+                    // debug!(logger, "Updating flow cell...");
+                    // update_flowcell(logger, &mut client, &run_info, &run_params, &settings);
+                }
                 flowcell
-            } else {
-                info!(
-                    logger,
-                    "Flow cell was not found but you asked me not to \
-                     register. Stopping here for this folder without \
-                     error."
-                );
-                return Ok(());
             }
-        }
-        _ => bail!("Problem resolving flowcell"),
-    };
+            Err(restson::Error::HttpError(404, _msg)) => {
+                debug!(logger, "Flow cell was not found!");
+                if settings.ingest.register {
+                    let flowcell =
+                        register_flowcell(logger, &mut client, &run_info, &run_params, &settings)?;
+                    debug!(logger, "Flow cell registered as {:?}", &flowcell);
+                    flowcell
+                } else {
+                    info!(
+                        logger,
+                        "Flow cell was not found but you asked me not to \
+                         register. Stopping here for this folder without \
+                         error."
+                    );
+                    return Ok(());
+                }
+            }
+            _ => bail!("Problem resolving flowcell"),
+        };
+    }
+
+    if settings.ingest.analyze_adapters {
+        analyze_adapters(
+            logger,
+            &run_info,
+            &run_params,
+            &path,
+            folder_layout,
+            &settings,
+        )?;
+    } else {
+        info!(logger, "You asked me to not analyze adapters.");
+    }
 
     info!(logger, "Done processing folder {:?}.", path);
     Ok(())
@@ -520,18 +675,6 @@ pub fn run(logger: &slog::Logger, settings: &Settings) -> Result<()> {
             _ => (),
         }
     }
-
-    // parse folder name
-    // parse folder contents
-    //
-    // try to get flowcell from API
-    // if not exists:
-    //    register flow cell
-    // else if different:
-    //    update flow cell
-
-    // analyze read count
-    // post to API
 
     if any_failed {
         bail!("Processing of at least one folder failed!")

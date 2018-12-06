@@ -1,6 +1,7 @@
 // `error_chain!` can recurse deeply.
 #![recursion_limit = "1024"]
 
+extern crate byteorder;
 #[macro_use]
 extern crate clap;
 extern crate config;
@@ -8,6 +9,8 @@ extern crate config;
 extern crate derivative;
 #[macro_use]
 extern crate error_chain;
+extern crate flate2;
+extern crate glob;
 extern crate restson;
 extern crate serde;
 #[macro_use]
