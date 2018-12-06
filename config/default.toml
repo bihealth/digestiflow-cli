@@ -1,9 +1,28 @@
 # Default configuration
 
+# Quiet output
+quiet = false
+# Verbose output
+verbose = false
+# Debug settings
 debug = false
+# Number of threads to use
+threads = 1
 
 [web]
 # URL to Digestiflow Web UI API
 url = ""
 # API key token to use
 key = ""
+
+[ingest]
+# Path to flowcell to ingest
+path = ""
+# Whether or not to register flow cell
+register = true
+# Whether or not to update flow cell metadata
+update = true
+# Whether or not to read adapter information
+analyze_adapters = false
+# Whether or not to post adapter information (when read) to API
+post_adapters = true

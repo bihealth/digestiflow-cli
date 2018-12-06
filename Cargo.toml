@@ -4,13 +4,21 @@ version = "0.1.0"
 authors = ["Manuel Holtgrewe <manuel.holtgrewe@bihealth.de>"]
 
 [dependencies]
+# Elegant error handling
+error-chain = "0.9"
 # XPath-based access to XML
 sxd-xpath = "0.4.2"
 # Command line handling
-clap = "2"
+clap = {version = "2", features = ["yaml"]}
 # Configuration management
 config = "0.9"
 # REST API client
 restson = "^0.4.1"
 serde = "^1.0"
 serde_derive = "^1.0"
+# SLOG Logging
+slog = {version = "2.4.1", features = ["max_level_trace", "release_max_level_debug"] }
+slog-term = "2.4.0"
+slog-async = "2.3.0"
+# Additional features for Derive
+derivative = "1.0.2"

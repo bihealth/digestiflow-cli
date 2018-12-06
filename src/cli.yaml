@@ -1,0 +1,66 @@
+name: digestiflow-cli-client
+version: 0.1.0
+about: CLI Client for Digestiflow
+author: Manuel Holtgrewe <manuel.holtgrewe@bihealth.de>
+settings:
+- SubcommandRequiredElseHelp
+- ColorAuto
+- DeriveDisplayOrder
+- GlobalVersion
+- StrictUtf8
+- UnifiedHelpMessage
+
+args:
+- verbose:
+    long: verbose
+    short: v
+    multiple: true
+    takes_value: false
+    global: true
+    help: Increase verbosity
+- quiet:
+    long: quiet
+    short: q
+    multiple: true
+    takes_value: false
+    global: true
+    help: Decrease verbosity
+- threads:
+    long: threads
+    short: t
+    takes_value: true
+    value_name: COUNT
+    global: true
+    default_value: '0'
+    help: Number of additional threads to use for (de)compression in I/O.
+
+subcommands:
+- ingest:
+    about: Analyze an Illumina flow cell directory
+    args:
+    - path:
+        takes_value: true
+        multiple: true
+        required: true
+        value_name: FLOWCELL_DIR
+        help: Path flow cell directory.
+    - register:
+        long: register
+        takes_value: false
+        required: false
+        help: Whether or not to register flow cell via the API.
+    - update:
+        long: update
+        takes_value: false
+        required: false
+        help: Whether or not to update the flow cell via the API
+    - analyze_adapters:
+        long: analyze_adapters
+        takes_value: false
+        required: false
+        help: Read adapters from binary base call files
+    - post_adapters:
+        long: post_adapterss
+        takes_value: false
+        required: false
+        help: Post adapters to API if read
