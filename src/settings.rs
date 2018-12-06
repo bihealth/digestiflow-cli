@@ -6,16 +6,18 @@ use config::{Config, ConfigError, Environment, File};
 pub struct Web {
     pub url: String,
     #[derivative(Debug = "ignore")]
-    pub key: String,
+    pub token: String,
 }
 
 #[derive(Debug, Deserialize)]
 pub struct IngestArgs {
+    pub project_uuid: String,
     pub path: Vec<String>,
     pub register: bool,
     pub update: bool,
     pub analyze_adapters: bool,
     pub post_adapters: bool,
+    pub operator: String,
 }
 
 #[derive(Debug, Deserialize)]
@@ -50,6 +52,9 @@ impl Settings {
                 }
                 if m.is_present("threads") {
                     s.set("threads", m.value_of("threads").unwrap())?;
+                }
+                if m.is_present("project_uuid") {
+                    s.set("ingest.project_uuid", m.value_of("project_uuid"))?;
                 }
                 s.set(
                     "ingest.path",

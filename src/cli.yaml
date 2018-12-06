@@ -44,6 +44,12 @@ subcommands:
         required: true
         value_name: FLOWCELL_DIR
         help: Path flow cell directory.
+    - project_uuid:
+        long: project-uuid
+        takes_value: true
+        required: false
+        value_name: PROJECT_UUID
+        help: The UUID of the project to write to.
     - register:
         long: register
         takes_value: false

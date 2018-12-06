@@ -16,6 +16,8 @@ url = ""
 key = ""
 
 [ingest]
+# The UUID of the project to import into by default
+project_uuid = ""
 # Path to flowcell to ingest
 path = ""
 # Whether or not to register flow cell
@@ -26,3 +28,5 @@ update = true
 analyze_adapters = false
 # Whether or not to post adapter information (when read) to API
 post_adapters = true
+# The operator string to use.
+operator = ""

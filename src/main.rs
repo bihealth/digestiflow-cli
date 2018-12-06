@@ -8,6 +8,7 @@ extern crate config;
 extern crate derivative;
 #[macro_use]
 extern crate error_chain;
+extern crate restson;
 extern crate serde;
 #[macro_use]
 extern crate serde_derive;
