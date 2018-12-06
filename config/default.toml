@@ -1,0 +1,9 @@
+# Default configuration
+
+debug = false
+
+[web]
+# URL to Digestiflow Web UI API
+url = ""
+# API key token to use
+key = ""
