@@ -11,6 +11,8 @@ extern crate derivative;
 extern crate error_chain;
 extern crate flate2;
 extern crate glob;
+extern crate rand;
+extern crate rayon;
 extern crate restson;
 extern crate serde;
 #[macro_use]

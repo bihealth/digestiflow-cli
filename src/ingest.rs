@@ -1,13 +1,15 @@
 use byteorder::{LittleEndian, ReadBytesExt};
-use flate2::read::GzDecoder;
+use flate2::read::MultiGzDecoder;
 use glob::glob;
+use rand::{self, Rng, SeedableRng};
+use rayon::prelude::*;
+use std::cmp;
 use std::collections::HashMap;
+use std::env;
 use std::fs::File;
-// use std::io;
 use std::io::prelude::*;
 use std::path::Path;
 use std::result;
-
 use sxd_document::dom::Document;
 use sxd_document::parser;
 use sxd_xpath::nodeset::Node;
@@ -18,73 +20,98 @@ use settings::Settings;
 
 use restson::{self, RestClient, RestPath};
 
-/// Flow cell information from the DigestiFlow API.
-#[derive(Debug, Serialize, Deserialize)]
-struct DigestiflowFlowCell {
-    pub sodar_uuid: Option<String>,
-    pub run_date: String,
-    pub run_number: i32,
-    pub slot: String,
-    pub vendor_id: String,
-    pub label: String,
-    pub manual_label: String,
-    pub description: String,
-    pub sequencing_machine: String,
-    pub num_lanes: i32,
-    pub operator: String,
-    pub rta_version: i32,
-    pub status_sequencing: String,
-    pub status_conversion: String,
-    pub status_delivery: String,
-    pub delivery_type: String,
-    pub planned_reads: String,
-    pub current_reads: String,
-}
+mod api {
+    use super::*;
 
-// Restson: resolve flowcel by (instrument, run_number, flowcell).
-
-struct ResolveFlowCellArgs {
-    pub project_uuid: String,
-    pub instrument: String,
-    pub run_number: i32,
-    pub flowcell: String,
-}
-
-impl<'a> RestPath<&'a ResolveFlowCellArgs> for DigestiflowFlowCell {
-    fn get_path(args: &'a ResolveFlowCellArgs) -> result::Result<String, restson::Error> {
-        Ok(format!(
-            "api/flowcells/{}/resolve/{}/{}/{}/",
-            &args.project_uuid, &args.instrument, args.run_number, &args.flowcell
-        ))
+    /// Flow cell information from the DigestiFlow API.
+    #[derive(Debug, Serialize, Deserialize, Clone)]
+    pub struct FlowCell {
+        pub sodar_uuid: Option<String>,
+        pub run_date: String,
+        pub run_number: i32,
+        pub slot: String,
+        pub vendor_id: String,
+        pub label: String,
+        pub manual_label: Option<String>,
+        pub description: Option<String>,
+        pub sequencing_machine: String,
+        pub num_lanes: i32,
+        pub operator: Option<String>,
+        pub rta_version: i32,
+        pub status_sequencing: String,
+        pub status_conversion: String,
+        pub status_delivery: String,
+        pub delivery_type: String,
+        pub planned_reads: Option<String>,
+        pub current_reads: Option<String>,
     }
-}
 
-// Restson: PUT FlowCell for creation
+    // Restson: resolve flowcel by (instrument, run_number, flowcell).
 
-struct ProjectArgs {
-    project_uuid: String,
-}
-
-impl<'a> RestPath<&'a ProjectArgs> for DigestiflowFlowCell {
-    fn get_path(args: &'a ProjectArgs) -> result::Result<String, restson::Error> {
-        Ok(format!("api/flowcells/{}/", &args.project_uuid))
+    pub struct ResolveFlowCellArgs {
+        pub project_uuid: String,
+        pub instrument: String,
+        pub run_number: i32,
+        pub flowcell: String,
     }
-}
 
-// Restson: GET/PUT Flowcell by SODAR UUID.
-
-struct ProjectFlowcellArgs {
-    project_uuid: String,
-    flowcell_uuid: String,
-}
-
-impl<'a> RestPath<&'a ProjectFlowcellArgs> for DigestiflowFlowCell {
-    fn get_path(args: &'a ProjectFlowcellArgs) -> result::Result<String, restson::Error> {
-        Ok(format!(
-            "api/flowcells/{}/{}/",
-            &args.project_uuid, &args.flowcell_uuid
-        ))
+    impl<'a> RestPath<&'a ResolveFlowCellArgs> for FlowCell {
+        fn get_path(args: &'a ResolveFlowCellArgs) -> result::Result<String, restson::Error> {
+            Ok(format!(
+                "api/flowcells/{}/resolve/{}/{}/{}/",
+                &args.project_uuid, &args.instrument, args.run_number, &args.flowcell
+            ))
+        }
     }
+
+    // Restson: PUT FlowCell for creation
+
+    pub struct ProjectArgs {
+        pub project_uuid: String,
+    }
+
+    impl<'a> RestPath<&'a ProjectArgs> for FlowCell {
+        fn get_path(args: &'a ProjectArgs) -> result::Result<String, restson::Error> {
+            Ok(format!("api/flowcells/{}/", &args.project_uuid))
+        }
+    }
+
+    // Restson: GET/PUT Flowcell by SODAR UUID.
+
+    pub struct ProjectFlowcellArgs {
+        pub project_uuid: String,
+        pub flowcell_uuid: String,
+    }
+
+    impl<'a> RestPath<&'a ProjectFlowcellArgs> for FlowCell {
+        fn get_path(args: &'a ProjectFlowcellArgs) -> result::Result<String, restson::Error> {
+            Ok(format!(
+                "api/flowcells/{}/{}/",
+                &args.project_uuid, &args.flowcell_uuid
+            ))
+        }
+    }
+
+    /// Index histogram information from the DigestiFlow API.
+    #[derive(Debug, Serialize, Deserialize)]
+    pub struct LaneIndexHistogram {
+        pub sodar_uuid: Option<String>,
+        pub flowcell: String,
+        pub lane: i32,
+        pub index_read_no: i32,
+        pub sample_size: usize,
+        pub histogram: HashMap<String, usize>,
+    }
+
+    impl<'a> RestPath<&'a ProjectFlowcellArgs> for LaneIndexHistogram {
+        fn get_path(args: &'a ProjectFlowcellArgs) -> result::Result<String, restson::Error> {
+            Ok(format!(
+                "api/indexhistos/{}/{}/",
+                &args.project_uuid, &args.flowcell_uuid
+            ))
+        }
+    }
+
 }
 
 #[derive(Debug, Copy, Clone)]
@@ -362,8 +389,8 @@ fn build_flow_cell(
     run_info: &RunInfo,
     run_params: &RunParameters,
     settings: &Settings,
-) -> DigestiflowFlowCell {
-    DigestiflowFlowCell {
+) -> api::FlowCell {
+    api::FlowCell {
         sodar_uuid: None,
         run_date: run_info.date.clone(),
         run_number: run_info.run_number,
@@ -376,12 +403,12 @@ fn build_flow_cell(
         } else {
             1
         },
-        planned_reads: string_description(&run_params.planned_reads),
-        current_reads: string_description(&run_info.reads),
-        manual_label: "".to_string(),
-        description: "".to_string(),
+        planned_reads: Some(string_description(&run_params.planned_reads)),
+        current_reads: Some(string_description(&run_info.reads)),
+        manual_label: None,
+        description: None,
         sequencing_machine: run_info.instrument.clone(),
-        operator: settings.ingest.operator.clone(),
+        operator: Some(settings.ingest.operator.clone()),
         status_sequencing: "initial".to_string(),
         status_conversion: "initial".to_string(),
         status_delivery: "initial".to_string(),
@@ -395,51 +422,183 @@ fn register_flowcell(
     run_info: &RunInfo,
     run_params: &RunParameters,
     settings: &Settings,
-) -> Result<DigestiflowFlowCell> {
+) -> Result<api::FlowCell> {
     info!(logger, "Registering flow cell...");
 
     let flowcell = build_flow_cell(run_info, run_params, settings);
     debug!(logger, "Registering flowcell as {:?}", &flowcell);
 
-    let args = ProjectArgs {
+    let args = api::ProjectArgs {
         project_uuid: settings.ingest.project_uuid.clone(),
     };
     let flowcell = client
         .post_capture(&args, &flowcell)
         .chain_err(|| "Problem registering data")?;
-    println!("Registered flowcell: {:?}", &flowcell);
+    debug!(logger, "Registered flowcell: {:?}", &flowcell);
 
     info!(logger, "Done registering flow cell.");
 
     Ok(flowcell)
 }
 
-// fn tile_paths(
-//     logger: &slog::Logger,
-//     folder_layout: FolderLayout,
-//     path: &Path,
-//     lane: i32,
-//     cycle: i32,
-// ) -> Vec<Path> {
-//     let tile_paths = Vec::new();
-//     debug!(
-//         logger,
-//         "Paths to tiles for lane {} and cycle {} are {}", lane, cycle, tile_paths
-//     );
-//     file_paths
-// }
+fn update_flowcell(
+    logger: &slog::Logger,
+    client: &mut RestClient,
+    flowcell: &api::FlowCell,
+    run_info: &RunInfo,
+    run_params: &RunParameters,
+    settings: &Settings,
+) -> Result<api::FlowCell> {
+    info!(logger, "Updating flow cell...");
 
-fn sample_adapters(
+    let rebuilt = build_flow_cell(run_info, run_params, settings);
+
+    if rebuilt.current_reads != flowcell.current_reads {
+        info!(
+            logger,
+            "Updating current reads {:?} => {:?}", flowcell.current_reads, rebuilt.current_reads
+        );
+        let flowcell = api::FlowCell {
+            current_reads: rebuilt.current_reads,
+            ..flowcell.clone()
+        };
+
+        let args = api::ProjectFlowcellArgs {
+            project_uuid: settings.ingest.project_uuid.clone(),
+            flowcell_uuid: flowcell.sodar_uuid.clone().unwrap(),
+        };
+        client
+            .put_capture(&args, &flowcell)
+            .chain_err(|| "Problem updating")
+    } else {
+        Ok(flowcell.clone())
+    }
+}
+
+/// A list of BCL files defining a stack of base calls for a tile.
+#[derive(Debug)]
+struct TileBclStack {
+    /// The number of the lane that this stack is for.
+    pub lane_no: i32,
+    /// The paths to the BCL files.
+    pub paths: Vec<String>,
+}
+
+/// For a given index read, a histogram of counts (probably cut to top 1% or so).
+#[derive(Debug)]
+struct IndexCounts {
+    /// The index of the index.
+    pub index_no: i32,
+    /// The index of the lane.
+    pub lane_no: i32,
+    /// The number of reads read.
+    pub sample_size: usize,
+    /// The filtered histogram of read frequencies.
+    pub hist: HashMap<String, usize>,
+}
+
+/// Analyze a single stack.
+fn analyze_stacks(
     logger: &slog::Logger,
     path: &Path,
-    desc: &ReadDescription,
-    folder_layout: FolderLayout,
+    lane_stacks: &Vec<Vec<TileBclStack>>,
+    stack_no: usize,
+    index_no: i32,
     settings: &Settings,
-    start_cycle: i32,
-) -> Result<()> {
-    // Helper table for building strings below.
-    let table: Vec<char> = vec!['A', 'C', 'G', 'T'];
+) -> Result<Vec<IndexCounts>> {
+    lane_stacks
+        .iter()
+        .map(|ref stacks_for_lane| {
+            let stack = &stacks_for_lane[stack_no];
+            // Read in the bases from the bcl files.
+            let bases = stack
+                .paths
+                .par_iter()
+                .map(|ref path| {
+                    // Open file
+                    debug!(logger, "Processing file {}...", &path);
+                    let file = File::open(&path).chain_err(|| "Problem opening gzip file")?;
+                    let mut gz_decoder = MultiGzDecoder::new(file);
 
+                    // Read number of bytes in file.
+                    let num_bytes = gz_decoder
+                        .read_u32::<LittleEndian>()
+                        .chain_err(|| "Problem reading byte count")?
+                        as usize;
+
+                    // Read array with bases and quality values.
+                    let num_bytes = if settings.ingest.sample_reads_per_tile > 0 {
+                        cmp::min(num_bytes, settings.ingest.sample_reads_per_tile as usize)
+                    } else {
+                        num_bytes
+                    };
+                    let mut buf = vec![0u8; num_bytes];
+                    gz_decoder
+                        .read_exact(&mut buf)
+                        .chain_err(|| "Problem reading payload")?;
+
+                    // Build bases for each spot, use no-call if all bits are unset.
+                    let table = vec!['A', 'C', 'G', 'T'];
+                    let mut chars = Vec::new();
+                    for i in 0..num_bytes {
+                        if buf[i] == 0 {
+                            chars.push('N');
+                        } else {
+                            chars.push(table[(buf[i] & 3) as usize]);
+                        }
+                    }
+                    debug!(logger, "Done processing {}.", &path);
+
+                    Ok(chars)
+                }).collect::<Result<Vec<_>>>()?;
+
+            // Build read sequences.
+            debug!(logger, "Building read sequences.");
+            let num_seqs = bases[0].len();
+            let seqs = (0..num_seqs)
+                .into_par_iter()
+                .map(|i| {
+                    let mut seq = String::new();
+                    for j in 0..(bases.len()) {
+                        seq.push(bases[j][i]);
+                    }
+                    seq
+                }).collect::<Vec<String>>();
+            debug!(logger, "Done building read sequences.");
+
+            // TODO: parallelize counting?
+
+            // Build histogram.
+            let mut hist: HashMap<String, usize> = HashMap::new();
+            for seq in &seqs {
+                *hist.entry(seq.clone()).or_insert(1) += 1;
+            }
+
+            // Filter to top 1%.
+            let mut filtered_hist = HashMap::new();
+            for (seq, count) in hist {
+                if count > num_seqs / 100 {
+                    filtered_hist.insert(seq.clone(), count);
+                }
+            }
+            debug!(logger, "=> filtered hist {:?}", &filtered_hist);
+
+            Ok(IndexCounts {
+                index_no: index_no,
+                lane_no: stack.lane_no,
+                sample_size: num_seqs,
+                hist: filtered_hist,
+            })
+        }).collect()
+}
+
+fn find_file_stacks(
+    logger: &slog::Logger,
+    folder_layout: FolderLayout,
+    desc: &ReadDescription,
+    path: &Path,
+    start_cycle: i32,
+) -> Result<Vec<Vec<TileBclStack>>> {
     match folder_layout {
         FolderLayout::MiniSeq => {
             let path = path
@@ -452,69 +611,103 @@ fn sample_adapters(
                 .map(|x| x.unwrap().to_str().unwrap().to_string())
                 .collect::<Vec<String>>();
 
-            for ref lane_path in &lane_paths {
-                info!(logger, "Considering lane path {}", &lane_path);
-                let mut reads: Vec<String> = Vec::new();
-
+            let mut lane_stacks = Vec::new();
+            for (lane_no, ref lane_path) in lane_paths.iter().enumerate() {
+                let mut paths: Vec<String> = Vec::new();
                 for cycle in start_cycle..(start_cycle + desc.num_cycles) {
-                    let cycle_path = Path::new(lane_path).join(format!("{:04}.bcl.bgzf", cycle));
-                    info!(
-                        logger,
-                        "Opening file {}",
-                        cycle_path.to_str().unwrap().to_string()
+                    paths.push(
+                        Path::new(lane_path)
+                            .join(format!("{:04}.bcl.bgzf", cycle))
+                            .to_str()
+                            .unwrap()
+                            .to_string(),
                     );
-
-                    let mut file =
-                        File::open(&cycle_path).chain_err(|| "Problem opening gzip file")?;
-                    let mut gz_decoder = GzDecoder::new(file);
-                    // Read number of bytes in file.
-                    let mut buf = [0u32; 1];
-                    let num_bytes = gz_decoder
-                        .read_u32::<LittleEndian>()
-                        .chain_err(|| "Problem reading byte count")?
-                        as usize;
-                    // Allocate array of strings if necessary.
-                    if reads.is_empty() {
-                        reads.resize(num_bytes, String::new());
-                    }
-                    // Read array with bases and quality values.
-                    let mut buf = vec![0u8; num_bytes];
-                    gz_decoder
-                        .read(&mut buf[..])
-                        .chain_err(|| "Problem reading payload")?;
-                    // Strip quality from bases, set "N" where qualitiy is 0.
-                    for i in 0..num_bytes {
-                        if buf[i] == 0 {
-                            reads[i].push('N');
-                        } else {
-                            reads[i].push(table[(buf[i] & 3) as usize]);
-                        }
-                    }
                 }
-
-                let mut counter: HashMap<String, u64> = HashMap::new();
-                for read in &reads {
-                    *counter.entry(read.clone()).or_insert(1u64) += 1;
-                }
-
-                for (seq, count) in counter.iter() {
-                    if *count > 100 {
-                        println!("{}\t{}", seq, count);
-                    }
-                }
+                lane_stacks.push(vec![TileBclStack {
+                    lane_no: lane_no as i32 + 1,
+                    paths: paths,
+                }]);
             }
+
+            Ok(lane_stacks)
+        }
+        FolderLayout::MiSeq => {
+            let path = path
+                .join("Data")
+                .join("Intensities")
+                .join("BaseCalls")
+                .join("L???");
+            let lane_paths = glob(path.to_str().unwrap())
+                .expect("Failed to read glob pattern")
+                .map(|x| x.unwrap().to_str().unwrap().to_string())
+                .collect::<Vec<String>>();
+
+            let mut tile_stacks = Vec::new();
+            for (lane_no, ref lane_path) in lane_paths.iter().enumerate() {
+                let mut lane_stacks = Vec::new();
+                let path = Path::new(lane_path).join("C1.1").join("s_?_????.bcl.gz");
+                for prototype in glob(path.to_str().unwrap()).unwrap() {
+                    let path = prototype.unwrap();
+                    let file_name = path.file_name().unwrap();
+                    let mut paths: Vec<String> = Vec::new();
+                    for cycle in start_cycle..(start_cycle + desc.num_cycles) {
+                        let path = Path::new(lane_path)
+                            .join(format!("C{}.1", cycle))
+                            .join(file_name);
+                        paths.push(path.to_str().unwrap().to_string());
+                    }
+                    lane_stacks.push(TileBclStack {
+                        lane_no: lane_no as i32 + 1,
+                        paths: paths,
+                    });
+                }
+                tile_stacks.push(lane_stacks);
+            }
+
+            Ok(tile_stacks)
         }
         _ => bail!(
             "Don't know yet how to process folder layout {:?}",
             folder_layout
         ),
-    };
+    }
+}
 
-    Ok(())
+/// Sample adapters for the given index read described in `desc` and return
+/// `IndexCounts` for each lane.
+fn sample_adapters(
+    logger: &slog::Logger,
+    path: &Path,
+    desc: &ReadDescription,
+    folder_layout: FolderLayout,
+    settings: &Settings,
+    index_no: i32,
+    start_cycle: i32,
+) -> Result<Vec<IndexCounts>> {
+    // Helper table for building strings below.
+    let table: Vec<char> = vec!['A', 'C', 'G', 'T'];
+
+    // Depending on the directory layout, build stacks of files to get adapters from.
+    // Through this abstraction, we can treat the different layouts the same in
+    // extracting the adapters.
+    info!(logger, "Getting paths to base call files...");
+    let stacks = find_file_stacks(logger, folder_layout, desc, path, start_cycle)
+        .chain_err(|| "Problem building paths to files")?;
+
+    let mut rng = rand::XorShiftRng::seed_from_u64(settings.seed);
+    let stack_no = rng.gen_range(0, stacks[0].len());
+
+    info!(logger, "Analyzing base call files...");
+    let counts = analyze_stacks(logger, path, &stacks, stack_no, index_no, settings)
+        .chain_err(|| "Problem with analyzing stacks")?;
+
+    Ok(counts)
 }
 
 fn analyze_adapters(
     logger: &slog::Logger,
+    flowcell: &api::FlowCell,
+    client: &mut RestClient,
     run_info: &RunInfo,
     run_params: &RunParameters,
     path: &Path,
@@ -523,10 +716,43 @@ fn analyze_adapters(
 ) -> Result<()> {
     info!(logger, "Analyzing adapters...");
 
+    let mut index_no = 0i32;
     let mut cycle = 0i32;
     for ref desc in &run_info.reads {
         if desc.is_index {
-            sample_adapters(logger, path, &desc, folder_layout, settings, cycle)?;
+            index_no += 1;
+            let index_counts = sample_adapters(
+                logger,
+                path,
+                &desc,
+                folder_layout,
+                settings,
+                index_no,
+                cycle,
+            )?;
+
+            // Push results to API
+            if settings.ingest.post_adapters {
+                for (i, index_info) in index_counts.iter().enumerate() {
+                    let lane_no = i + 1;
+                    let api_hist = api::LaneIndexHistogram {
+                        sodar_uuid: None,
+                        flowcell: flowcell.sodar_uuid.clone().unwrap(),
+                        lane: lane_no as i32,
+                        index_read_no: index_no,
+                        sample_size: index_info.sample_size,
+                        histogram: index_info.hist.clone(),
+                    };
+                    client
+                        .post(
+                            &api::ProjectFlowcellArgs {
+                                project_uuid: settings.ingest.project_uuid.clone(),
+                                flowcell_uuid: flowcell.sodar_uuid.clone().unwrap(),
+                            },
+                            &api_hist,
+                        ).chain_err(|| "Could not update adapter on server")?
+                }
+            }
         }
         cycle += desc.num_cycles;
     }
@@ -588,28 +814,34 @@ fn process_folder(logger: &slog::Logger, path: &Path, settings: &Settings) -> Re
     let (run_info, run_params) = process_xml(logger, path, folder_layout, &info_doc, &param_doc)?;
 
     // Try to get the flow cell information from API.
-    if settings.ingest.register || settings.ingest.update {
-        let mut client = RestClient::new(&settings.web.url).unwrap();
-        client
-            .set_header("Authorization", &format!("Token {}", &settings.web.token))
-            .chain_err(|| "Problem configuring REST client")?;
-        let result: result::Result<DigestiflowFlowCell, restson::Error> =
-            client.get(&ResolveFlowCellArgs {
-                project_uuid: settings.ingest.project_uuid.clone(),
-                instrument: run_info.instrument.clone(),
-                run_number: run_info.run_number,
-                flowcell: run_info.flowcell.clone(),
-            });
+    let mut client = RestClient::new(&settings.web.url).unwrap();
+    client
+        .set_header("Authorization", &format!("Token {}", &settings.web.token))
+        .chain_err(|| "Problem configuring REST client")?;
+    let result: result::Result<api::FlowCell, restson::Error> =
+        client.get(&api::ResolveFlowCellArgs {
+            project_uuid: settings.ingest.project_uuid.clone(),
+            instrument: run_info.instrument.clone(),
+            run_number: run_info.run_number,
+            flowcell: run_info.flowcell.clone(),
+        });
+    let flowcell: api::FlowCell = if settings.ingest.register || settings.ingest.update {
         // Update or create if necessary.
-        let flowcell: DigestiflowFlowCell = match result {
+        match result {
             Ok(flowcell) => {
                 debug!(logger, "Flow cell found with value {:?}", &flowcell);
                 if settings.ingest.update {
-                    // TODO
-                    // debug!(logger, "Updating flow cell...");
-                    // update_flowcell(logger, &mut client, &run_info, &run_params, &settings);
+                    update_flowcell(
+                        logger,
+                        &mut client,
+                        &flowcell,
+                        &run_info,
+                        &run_params,
+                        &settings,
+                    )?
+                } else {
+                    flowcell
                 }
-                flowcell
             }
             Err(restson::Error::HttpError(404, _msg)) => {
                 debug!(logger, "Flow cell was not found!");
@@ -628,13 +860,18 @@ fn process_folder(logger: &slog::Logger, path: &Path, settings: &Settings) -> Re
                     return Ok(());
                 }
             }
-            _ => bail!("Problem resolving flowcell"),
-        };
-    }
+            _x => bail!("Problem resolving flowcell {:?}", &_x),
+        }
+    } else {
+        // TODO: improve error handling
+        result.expect("Flowcell not found but we are not supposed to register")
+    };
 
     if settings.ingest.analyze_adapters {
         analyze_adapters(
             logger,
+            &flowcell,
+            &mut client,
             &run_info,
             &run_params,
             &path,
@@ -652,11 +889,16 @@ fn process_folder(logger: &slog::Logger, path: &Path, settings: &Settings) -> Re
 pub fn run(logger: &slog::Logger, settings: &Settings) -> Result<()> {
     info!(logger, "Running: digestiflow-cli-client ingest");
     info!(logger, "Options: {:?}", settings);
+    env::set_var("RAYON_NUM_THREADS", format!("{}", settings.threads));
 
     // Bail out in case of missing project UUID.
     if settings.ingest.project_uuid.is_empty() {
         bail!("You have to specify the project UUID");
     }
+
+    // Setting number of threads to use in Rayon.
+    debug!(logger, "Using {} threads", settings.threads);
+    env::set_var("RAYON_NUM_THREADS", format!("{}", settings.threads));
 
     let mut any_failed = false;
     for ref path in &settings.ingest.path {

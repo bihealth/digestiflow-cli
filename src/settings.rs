@@ -29,6 +29,7 @@ pub struct Settings {
     pub quiet: bool,
     pub threads: i32,
     pub web: Web,
+    pub seed: u64,
     pub ingest: IngestArgs,
 }
 
@@ -76,6 +77,12 @@ impl Settings {
                 }
                 if m.is_present("post_adapters") {
                     s.set("ingest.post_adapters", true)?;
+                }
+                if m.is_present("sample_reads_per_tile") {
+                    s.set(
+                        "ingest.sample_reads_per_tile",
+                        m.value_of("sample_reads_per_tile"),
+                    )?;
                 }
             }
             _ => {

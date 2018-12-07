@@ -8,6 +8,8 @@ verbose = false
 debug = false
 # Number of threads to use
 threads = 1
+# RNG seed
+seed = 42
 
 [web]
 # URL to Digestiflow Web UI API
@@ -33,4 +35,4 @@ operator = ""
 # From how many tiles to sample (if there are tiles)
 sample_tiles = 1
 # How many reads to sample per tile (if there are files per tile)
-sample_reads_per_tile = 100000
+sample_reads_per_tile = 0

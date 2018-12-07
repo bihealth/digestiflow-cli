@@ -29,3 +29,7 @@ glob = "0.2.11"
 flate2 = "1.0.6"
 # byte order
 byteorder = "*"
+# RNG
+rand = "0.6.1"
+# Parallelism library
+rayon = "1.0"

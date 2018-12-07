@@ -65,8 +65,9 @@ subcommands:
         takes_value: false
         required: false
         help: Read adapters from binary base call files
-    - post_adapters:
-        long: post-adapterss
-        takes_value: false
+    - sample_reads_per_tile:
+        long: sample-reads-per-tile
+        takes_value: true
+        value_name: COUNT
         required: false
-        help: Post adapters to API if read
+        help: Number of reads to sample per tile
