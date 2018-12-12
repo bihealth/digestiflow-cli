@@ -31,5 +31,8 @@ flate2 = "1.0.6"
 byteorder = "*"
 # RNG
 rand = "0.6.1"
+rand_xorshift = "0.1.0"
 # Parallelism library
 rayon = "1.0"
+# Path helper
+shellexpand = "1.0.0"

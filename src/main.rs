@@ -12,11 +12,13 @@ extern crate error_chain;
 extern crate flate2;
 extern crate glob;
 extern crate rand;
+extern crate rand_xorshift;
 extern crate rayon;
 extern crate restson;
 extern crate serde;
 #[macro_use]
 extern crate serde_derive;
+extern crate shellexpand;
 #[macro_use]
 extern crate slog;
 extern crate slog_async;

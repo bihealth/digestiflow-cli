@@ -10,12 +10,14 @@ debug = false
 threads = 1
 # RNG seed
 seed = 42
+# Write token to debug log file (possible security implications)
+log_token = false
 
 [web]
 # URL to Digestiflow Web UI API
 url = ""
 # API key token to use
-key = ""
+token = ""
 
 [ingest]
 # The UUID of the project to import into by default

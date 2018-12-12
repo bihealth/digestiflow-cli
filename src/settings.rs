@@ -1,5 +1,7 @@
 use clap::ArgMatches;
 use config::{Config, ConfigError, Environment, File};
+use shellexpand;
+use std::path::Path;
 
 #[derive(Derivative, Deserialize)]
 #[derivative(Debug)]
@@ -7,6 +9,15 @@ pub struct Web {
     pub url: String,
     #[derivative(Debug = "ignore")]
     pub token: String,
+}
+
+impl Default for Web {
+    fn default() -> Self {
+        return Self {
+            url: "".to_string(),
+            token: "".to_string(),
+        };
+    }
 }
 
 #[derive(Debug, Deserialize)]
@@ -22,23 +33,94 @@ pub struct IngestArgs {
     pub sample_reads_per_tile: i32,
 }
 
+impl Default for IngestArgs {
+    fn default() -> Self {
+        return IngestArgs {
+            project_uuid: "".to_string(),
+            path: Vec::new(),
+            register: true,
+            update: true,
+            analyze_adapters: true,
+            post_adapters: true,
+            operator: "".to_string(),
+            sample_tiles: 1,
+            sample_reads_per_tile: 0,
+        };
+    }
+}
+
 #[derive(Debug, Deserialize)]
 pub struct Settings {
     pub debug: bool,
     pub verbose: bool,
     pub quiet: bool,
     pub threads: i32,
-    pub web: Web,
     pub seed: u64,
+    pub log_token: bool,
+    pub web: Web,
     pub ingest: IngestArgs,
+}
+
+impl Default for Settings {
+    fn default() -> Self {
+        return Self {
+            debug: false,
+            verbose: false,
+            quiet: false,
+            threads: 1,
+            web: Web::default(),
+            ingest: IngestArgs::default(),
+            seed: 42,
+            log_token: false,
+        };
+    }
 }
 
 impl Settings {
     pub fn new(matches: &ArgMatches) -> Result<Self, ConfigError> {
         let mut s = Config::new();
 
-        // Start off with the default configuration.
-        s.merge(File::with_name("config/default"))?;
+        // Set defaults (currently explicit required, see for a future less-boilerplate option
+        // https://github.com/mehcode/config-rs/issues/60)
+        let default = Settings::default();
+        s.set_default("debug", default.debug).unwrap();
+        s.set_default("verbose", default.verbose).unwrap();
+        s.set_default("quiet", default.quiet).unwrap();
+        s.set_default("threads", default.threads as i64).unwrap();
+        s.set_default("seed", default.seed as i64).unwrap();
+        s.set_default("log_token", default.log_token).unwrap();
+
+        s.set_default("web.token", default.web.token.clone())
+            .unwrap();
+        s.set_default("web.url", default.web.url.clone()).unwrap();
+
+        s.set_default("ingest.project_uuid", default.ingest.project_uuid)
+            .unwrap();
+        s.set_default("ingest.path", default.ingest.path).unwrap();
+        s.set_default("ingest.register", default.ingest.register)
+            .unwrap();
+        s.set_default("ingest.update", default.ingest.update)
+            .unwrap();
+        s.set_default("ingest.analyze_adapters", default.ingest.analyze_adapters)
+            .unwrap();
+        s.set_default("ingest.post_adapters", default.ingest.post_adapters)
+            .unwrap();
+        s.set_default("ingest.operator", default.ingest.operator)
+            .unwrap();
+        s.set_default("ingest.sample_tiles", default.ingest.sample_tiles as i64)
+            .unwrap();
+        s.set_default(
+            "ingest.sample_reads_per_tile",
+            default.ingest.sample_reads_per_tile as i64,
+        ).unwrap();
+
+        // Next, load configuration file.
+        let expanded = shellexpand::tilde("~/.digestiflowrc")
+            .into_owned()
+            .to_string();
+        if Path::new(&expanded).exists() {
+            s.merge(File::with_name(&expanded))?;
+        }
 
         // Add in settings from the environment (with a prefix of APP)
         // Eg.. `APP_DEBUG=1 ./target/app` would set the `debug` key
@@ -53,8 +135,14 @@ impl Settings {
                 if m.is_present("quiet") {
                     s.set("verbose", true)?;
                 }
+                if m.is_present("log_token") {
+                    s.set("log_token", true)?;
+                }
                 if m.is_present("threads") {
                     s.set("threads", m.value_of("threads").unwrap())?;
+                }
+                if m.is_present("web_url") {
+                    s.set("web.url", m.value_of("web_url").unwrap())?;
                 }
                 if m.is_present("project_uuid") {
                     s.set("ingest.project_uuid", m.value_of("project_uuid"))?;

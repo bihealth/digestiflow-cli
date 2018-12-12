@@ -1,7 +1,8 @@
 use byteorder::{LittleEndian, ReadBytesExt};
 use flate2::read::MultiGzDecoder;
 use glob::glob;
-use rand::{self, Rng, SeedableRng};
+use rand::{Rng, SeedableRng};
+use rand_xorshift;
 use rayon::prelude::*;
 use std::cmp;
 use std::collections::HashMap;
@@ -31,7 +32,7 @@ mod api {
         pub run_number: i32,
         pub slot: String,
         pub vendor_id: String,
-        pub label: String,
+        pub label: Option<String>,
         pub manual_label: Option<String>,
         pub description: Option<String>,
         pub sequencing_machine: String,
@@ -364,7 +365,6 @@ fn process_xml_param_doc_miniseq(info_doc: &Document) -> Result<RunParameters> {
 
 fn process_xml(
     logger: &slog::Logger,
-    path: &Path,
     folder_layout: FolderLayout,
     info_doc: &Document,
     param_doc: &Document,
@@ -396,7 +396,7 @@ fn build_flow_cell(
         run_number: run_info.run_number,
         slot: run_params.flowcell_slot.clone(),
         vendor_id: run_info.flowcell.clone(),
-        label: run_params.experiment_name.clone(),
+        label: Some(run_params.experiment_name.clone()),
         num_lanes: run_info.lane_count,
         rta_version: if run_params.rta_version.starts_with(&"2") {
             2
@@ -453,26 +453,21 @@ fn update_flowcell(
 
     let rebuilt = build_flow_cell(run_info, run_params, settings);
 
-    if rebuilt.current_reads != flowcell.current_reads {
-        info!(
-            logger,
-            "Updating current reads {:?} => {:?}", flowcell.current_reads, rebuilt.current_reads
-        );
-        let flowcell = api::FlowCell {
-            current_reads: rebuilt.current_reads,
-            ..flowcell.clone()
-        };
+    let flowcell = api::FlowCell {
+        planned_reads: rebuilt.planned_reads.clone(),
+        current_reads: rebuilt.current_reads.clone(),
+        ..flowcell.clone()
+    };
+    info!(logger, "Will update flow cell");
+    debug!(logger, "  {:?} => {:?}", &flowcell, &rebuilt);
 
-        let args = api::ProjectFlowcellArgs {
-            project_uuid: settings.ingest.project_uuid.clone(),
-            flowcell_uuid: flowcell.sodar_uuid.clone().unwrap(),
-        };
-        client
-            .put_capture(&args, &flowcell)
-            .chain_err(|| "Problem updating")
-    } else {
-        Ok(flowcell.clone())
-    }
+    let args = api::ProjectFlowcellArgs {
+        project_uuid: settings.ingest.project_uuid.clone(),
+        flowcell_uuid: flowcell.sodar_uuid.clone().unwrap(),
+    };
+    client
+        .put_capture(&args, &flowcell)
+        .chain_err(|| "Problem updating")
 }
 
 /// A list of BCL files defining a stack of base calls for a tile.
@@ -500,14 +495,13 @@ struct IndexCounts {
 /// Analyze a single stack.
 fn analyze_stacks(
     logger: &slog::Logger,
-    path: &Path,
     lane_stacks: &Vec<Vec<TileBclStack>>,
     stack_no: usize,
     index_no: i32,
     settings: &Settings,
 ) -> Result<Vec<IndexCounts>> {
     lane_stacks
-        .iter()
+        .par_iter()
         .map(|ref stacks_for_lane| {
             let stack = &stacks_for_lane[stack_no];
             // Read in the bases from the bcl files.
@@ -593,7 +587,7 @@ fn analyze_stacks(
 }
 
 fn find_file_stacks(
-    logger: &slog::Logger,
+    _logger: &slog::Logger,
     folder_layout: FolderLayout,
     desc: &ReadDescription,
     path: &Path,
@@ -684,9 +678,6 @@ fn sample_adapters(
     index_no: i32,
     start_cycle: i32,
 ) -> Result<Vec<IndexCounts>> {
-    // Helper table for building strings below.
-    let table: Vec<char> = vec!['A', 'C', 'G', 'T'];
-
     // Depending on the directory layout, build stacks of files to get adapters from.
     // Through this abstraction, we can treat the different layouts the same in
     // extracting the adapters.
@@ -694,11 +685,11 @@ fn sample_adapters(
     let stacks = find_file_stacks(logger, folder_layout, desc, path, start_cycle)
         .chain_err(|| "Problem building paths to files")?;
 
-    let mut rng = rand::XorShiftRng::seed_from_u64(settings.seed);
+    let mut rng = rand_xorshift::XorShiftRng::seed_from_u64(settings.seed);
     let stack_no = rng.gen_range(0, stacks[0].len());
 
     info!(logger, "Analyzing base call files...");
-    let counts = analyze_stacks(logger, path, &stacks, stack_no, index_no, settings)
+    let counts = analyze_stacks(logger, &stacks, stack_no, index_no, settings)
         .chain_err(|| "Problem with analyzing stacks")?;
 
     Ok(counts)
@@ -709,7 +700,6 @@ fn analyze_adapters(
     flowcell: &api::FlowCell,
     client: &mut RestClient,
     run_info: &RunInfo,
-    run_params: &RunParameters,
     path: &Path,
     folder_layout: FolderLayout,
     settings: &Settings,
@@ -717,7 +707,7 @@ fn analyze_adapters(
     info!(logger, "Analyzing adapters...");
 
     let mut index_no = 0i32;
-    let mut cycle = 0i32;
+    let mut cycle = 1i32; // always throw away first cycle
     for ref desc in &run_info.reads {
         if desc.is_index {
             index_no += 1;
@@ -811,9 +801,16 @@ fn process_folder(logger: &slog::Logger, path: &Path, settings: &Settings) -> Re
     let param_doc = param_pkg.as_document();
 
     // Process the XML files.
-    let (run_info, run_params) = process_xml(logger, path, folder_layout, &info_doc, &param_doc)?;
+    let (run_info, run_params) = process_xml(logger, folder_layout, &info_doc, &param_doc)?;
 
     // Try to get the flow cell information from API.
+    debug!(logger, "Connecting to \"{}\"", &settings.web.url);
+    if settings.log_token {
+        debug!(
+            logger,
+            "  (using header 'Authorization: Token {}')", &settings.web.token
+        );
+    }
     let mut client = RestClient::new(&settings.web.url).unwrap();
     client
         .set_header("Authorization", &format!("Token {}", &settings.web.token))
@@ -873,7 +870,6 @@ fn process_folder(logger: &slog::Logger, path: &Path, settings: &Settings) -> Re
             &flowcell,
             &mut client,
             &run_info,
-            &run_params,
             &path,
             folder_layout,
             &settings,

@@ -33,6 +33,16 @@ args:
     global: true
     default_value: '0'
     help: Number of additional threads to use for (de)compression in I/O.
+- log_token:
+    long: log-token
+    global: true
+    help: Print authentation token to log file (useful for debugging, possible leaking security issue)
+- web_url:
+    long: web-url
+    takes_value: true
+    required: false
+    value_name: URL
+    help: The URL with the Digestiflow Web UI server.
 
 subcommands:
 - ingest:
