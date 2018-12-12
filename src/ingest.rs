@@ -544,7 +544,8 @@ fn analyze_stacks(
                     debug!(logger, "Done processing {}.", &path);
 
                     Ok(chars)
-                }).collect::<Result<Vec<_>>>()?;
+                })
+                .collect::<Result<Vec<_>>>()?;
 
             // Build read sequences.
             debug!(logger, "Building read sequences.");
@@ -557,7 +558,8 @@ fn analyze_stacks(
                         seq.push(bases[j][i]);
                     }
                     seq
-                }).collect::<Vec<String>>();
+                })
+                .collect::<Vec<String>>();
             debug!(logger, "Done building read sequences.");
 
             // TODO: parallelize counting?
@@ -583,7 +585,8 @@ fn analyze_stacks(
                 sample_size: num_seqs,
                 hist: filtered_hist,
             })
-        }).collect()
+        })
+        .collect()
 }
 
 fn find_file_stacks(
@@ -740,7 +743,8 @@ fn analyze_adapters(
                                 flowcell_uuid: flowcell.sodar_uuid.clone().unwrap(),
                             },
                             &api_hist,
-                        ).chain_err(|| "Could not update adapter on server")?
+                        )
+                        .chain_err(|| "Could not update adapter on server")?
                 }
             }
         }
@@ -896,12 +900,10 @@ pub fn run(logger: &slog::Logger, settings: &Settings) -> Result<()> {
     debug!(logger, "Using {} threads", settings.threads);
     env::set_var("RAYON_NUM_THREADS", format!("{}", settings.threads));
 
-    let mut any_failed = false;
-    for ref path in &settings.ingest.path {
+    let any_failed: bool = settings.ingest.path./*par_*/iter().map(|ref path| {
         let path = Path::new(path);
         match process_folder(logger, &path, settings) {
             Err(e) => {
-                any_failed = true;
                 error!(logger, "Folder processing failed: {:?}", &e);
                 warn!(
                     logger,
@@ -909,10 +911,11 @@ pub fn run(logger: &slog::Logger, settings: &Settings) -> Result<()> {
                      call will not have return code 0!",
                     &path
                 );
+                true // == any failed
             }
-            _ => (),
+            _ => false,  // == any failed
         }
-    }
+    }).any(|failed| failed);
 
     if any_failed {
         bail!("Processing of at least one folder failed!")

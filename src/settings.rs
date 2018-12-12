@@ -83,39 +83,30 @@ impl Settings {
         // Set defaults (currently explicit required, see for a future less-boilerplate option
         // https://github.com/mehcode/config-rs/issues/60)
         let default = Settings::default();
-        s.set_default("debug", default.debug).unwrap();
-        s.set_default("verbose", default.verbose).unwrap();
-        s.set_default("quiet", default.quiet).unwrap();
-        s.set_default("threads", default.threads as i64).unwrap();
-        s.set_default("seed", default.seed as i64).unwrap();
-        s.set_default("log_token", default.log_token).unwrap();
 
-        s.set_default("web.token", default.web.token.clone())
-            .unwrap();
-        s.set_default("web.url", default.web.url.clone()).unwrap();
-
-        s.set_default("ingest.project_uuid", default.ingest.project_uuid)
-            .unwrap();
-        s.set_default("ingest.path", default.ingest.path).unwrap();
-        s.set_default("ingest.register", default.ingest.register)
-            .unwrap();
-        s.set_default("ingest.update", default.ingest.update)
-            .unwrap();
-        s.set_default("ingest.analyze_adapters", default.ingest.analyze_adapters)
-            .unwrap();
-        s.set_default("ingest.post_adapters", default.ingest.post_adapters)
-            .unwrap();
-        s.set_default("ingest.operator", default.ingest.operator)
-            .unwrap();
-        s.set_default("ingest.sample_tiles", default.ingest.sample_tiles as i64)
-            .unwrap();
-        s.set_default(
-            "ingest.sample_reads_per_tile",
-            default.ingest.sample_reads_per_tile as i64,
-        ).unwrap();
+        s.set_default("debug", default.debug)?
+            .set_default("verbose", default.verbose)?
+            .set_default("quiet", default.quiet)?
+            .set_default("threads", default.threads as i64)?
+            .set_default("seed", default.seed as i64)?
+            .set_default("log_token", default.log_token)?
+            .set_default("web.token", default.web.token.clone())?
+            .set_default("web.url", default.web.url.clone())?
+            .set_default("ingest.project_uuid", default.ingest.project_uuid)?
+            .set_default("ingest.path", default.ingest.path)?
+            .set_default("ingest.register", default.ingest.register)?
+            .set_default("ingest.update", default.ingest.update)?
+            .set_default("ingest.analyze_adapters", default.ingest.analyze_adapters)?
+            .set_default("ingest.post_adapters", default.ingest.post_adapters)?
+            .set_default("ingest.operator", default.ingest.operator)?
+            .set_default("ingest.sample_tiles", default.ingest.sample_tiles as i64)?
+            .set_default(
+                "ingest.sample_reads_per_tile",
+                default.ingest.sample_reads_per_tile as i64,
+            )?;
 
         // Next, load configuration file.
-        let expanded = shellexpand::tilde("~/.digestiflowrc")
+        let expanded = shellexpand::tilde("~/.digestiflowrc.toml")
             .into_owned()
             .to_string();
         if Path::new(&expanded).exists() {
