@@ -341,6 +341,17 @@ fn process_xml_param_doc_miniseq(info_doc: &Document) -> Result<RunParameters> {
         }
     }
 
+    if let Ok(value) = evaluate_xpath(&info_doc, "//PlannedIndex2ReadCycles/text()") {
+        let num_cycles = value.into_number() as i32;
+        if num_cycles != 0 {
+            reads.push(ReadDescription {
+                number: number,
+                num_cycles: num_cycles,
+                is_index: true,
+            });
+        }
+    }
+
     if let Ok(value) = evaluate_xpath(&info_doc, "//PlannedRead2Cycles/text()") {
         let num_cycles = value.into_number() as i32;
         if num_cycles != 0 {
@@ -350,17 +361,6 @@ fn process_xml_param_doc_miniseq(info_doc: &Document) -> Result<RunParameters> {
                 is_index: false,
             });
             number += 1;
-        }
-    }
-
-    if let Ok(value) = evaluate_xpath(&info_doc, "//PlannedIndex2ReadCycles/text()") {
-        let num_cycles = value.into_number() as i32;
-        if num_cycles != 0 {
-            reads.push(ReadDescription {
-                number: number,
-                num_cycles: num_cycles,
-                is_index: true,
-            });
         }
     }
 
