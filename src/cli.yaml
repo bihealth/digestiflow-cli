@@ -65,6 +65,11 @@ subcommands:
         takes_value: false
         required: false
         help: Whether or not to register flow cell via the API.
+    - analyze_if_state_final:
+        long: analyze-if-state-final
+        takes_value: false
+        required: false
+        help: Enforce analysis even sequencing state not initial/in progress any more.
     - no_update:
         long: no-update
         takes_value: false

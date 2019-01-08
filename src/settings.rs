@@ -31,6 +31,8 @@ pub struct IngestArgs {
     pub operator: String,
     pub sample_tiles: i32,
     pub sample_reads_per_tile: i32,
+    /// Skip if sequencing status is a final state.
+    pub skip_if_status_final: bool,
 }
 
 impl Default for IngestArgs {
@@ -45,6 +47,7 @@ impl Default for IngestArgs {
             operator: "".to_string(),
             sample_tiles: 1,
             sample_reads_per_tile: 0,
+            skip_if_status_final: true,
         };
     }
 }
@@ -101,6 +104,9 @@ impl Settings {
             .set_default("ingest.operator", default.ingest.operator)?
             .set_default("ingest.sample_tiles", default.ingest.sample_tiles as i64)?
             .set_default(
+                "ingest.skip_if_status_final",
+                default.ingest.skip_if_status_final,
+            )?.set_default(
                 "ingest.sample_reads_per_tile",
                 default.ingest.sample_reads_per_tile as i64,
             )?;
@@ -162,6 +168,9 @@ impl Settings {
                         "ingest.sample_reads_per_tile",
                         m.value_of("sample_reads_per_tile"),
                     )?;
+                }
+                if m.is_present("analyze_if_state_final") {
+                    s.set("ingest.skip_if_status_final", false)?;
                 }
             }
             _ => {

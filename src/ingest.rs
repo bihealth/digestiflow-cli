@@ -877,6 +877,7 @@ fn process_folder(logger: &slog::Logger, path: &Path, settings: &Settings) -> Re
             run_number: run_info.run_number,
             flowcell: run_info.flowcell.clone(),
         });
+
     let flowcell: api::FlowCell = if settings.ingest.register || settings.ingest.update {
         // Update or create if necessary.
         match result {
@@ -925,6 +926,18 @@ fn process_folder(logger: &slog::Logger, path: &Path, settings: &Settings) -> Re
         // TODO: improve error handling
         result.expect("Flowcell not found but we are not supposed to register")
     };
+
+    // Check if we should skip this directory.
+    if flowcell.status_sequencing != "initial" && flowcell.status_sequencing != "in_progress" {
+        if settings.ingest.skip_if_status_final {
+            info!(
+                logger,
+                "Flowcell has a final sequencing status ({:?}), skippping",
+                &flowcell.status_sequencing
+            );
+            return Ok(());
+        }
+    }
 
     if settings.ingest.analyze_adapters {
         analyze_adapters(
