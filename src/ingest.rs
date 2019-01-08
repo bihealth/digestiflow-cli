@@ -150,7 +150,7 @@ fn guess_folder_layout(path: &Path) -> Result<FolderLayout> {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 struct ReadDescription {
     pub number: i32,
     pub num_cycles: i32,
@@ -184,27 +184,30 @@ fn process_xml_run_info(info_doc: &Document) -> Result<RunInfo> {
         let mut reads = Vec::new();
         for node in nodeset.document_order() {
             if let Node::Element(elem) = node {
-                reads.push(ReadDescription {
-                    number: elem
-                        .attribute("Number")
-                        .expect("Problem accessing Number attribute")
-                        .value()
-                        .to_string()
-                        .parse::<i32>()
-                        .unwrap(),
-                    num_cycles: elem
-                        .attribute("NumCycles")
-                        .expect("Problem accessing NumCycles attribute")
-                        .value()
-                        .to_string()
-                        .parse::<i32>()
-                        .unwrap(),
-                    is_index: elem
-                        .attribute("IsIndexedRead")
-                        .expect("Problem accessing IsIndexedRead attribute")
-                        .value()
-                        == "Y",
-                })
+                let num_cycles = elem
+                    .attribute("NumCycles")
+                    .expect("Problem accessing NumCycles attribute")
+                    .value()
+                    .to_string()
+                    .parse::<i32>()
+                    .unwrap();
+                if num_cycles > 0 {
+                    reads.push(ReadDescription {
+                        number: elem
+                            .attribute("Number")
+                            .expect("Problem accessing Number attribute")
+                            .value()
+                            .to_string()
+                            .parse::<i32>()
+                            .unwrap(),
+                        num_cycles: num_cycles,
+                        is_index: elem
+                            .attribute("IsIndexedRead")
+                            .expect("Problem accessing IsIndexedRead attribute")
+                            .value()
+                            == "Y",
+                    })
+                }
             } else {
                 bail!("Read was not a tag!")
             }
@@ -256,27 +259,30 @@ fn process_xml_param_doc_miseq(info_doc: &Document) -> Result<RunParameters> {
         let mut reads = Vec::new();
         for node in nodeset.document_order() {
             if let Node::Element(elem) = node {
-                reads.push(ReadDescription {
-                    number: elem
-                        .attribute("Number")
-                        .expect("Problem accessing Number attribute")
-                        .value()
-                        .to_string()
-                        .parse::<i32>()
-                        .unwrap(),
-                    num_cycles: elem
-                        .attribute("NumCycles")
-                        .expect("Problem accessing NumCycles attribute")
-                        .value()
-                        .to_string()
-                        .parse::<i32>()
-                        .unwrap(),
-                    is_index: elem
-                        .attribute("IsIndexedRead")
-                        .expect("Problem accessing IsIndexedRead attribute")
-                        .value()
-                        == "Y",
-                })
+                let num_cycles = elem
+                    .attribute("NumCycles")
+                    .expect("Problem accessing NumCycles attribute")
+                    .value()
+                    .to_string()
+                    .parse::<i32>()
+                    .unwrap();
+                if num_cycles > 0 {
+                    reads.push(ReadDescription {
+                        number: elem
+                            .attribute("Number")
+                            .expect("Problem accessing Number attribute")
+                            .value()
+                            .to_string()
+                            .parse::<i32>()
+                            .unwrap(),
+                        num_cycles: num_cycles,
+                        is_index: elem
+                            .attribute("IsIndexedRead")
+                            .expect("Problem accessing IsIndexedRead attribute")
+                            .value()
+                            == "Y",
+                    })
+                }
             } else {
                 bail!("Read was not a tag!")
             }
@@ -312,38 +318,50 @@ fn process_xml_param_doc_miniseq(info_doc: &Document) -> Result<RunParameters> {
     let mut number = 1;
 
     if let Ok(value) = evaluate_xpath(&info_doc, "//PlannedRead1Cycles/text()") {
-        reads.push(ReadDescription {
-            number: number,
-            num_cycles: value.into_number() as i32,
-            is_index: false,
-        });
-        number += 1;
-    }
-
-    if let Ok(value) = evaluate_xpath(&info_doc, "//PlannedRead2Cycles/text()") {
-        reads.push(ReadDescription {
-            number: number,
-            num_cycles: value.into_number() as i32,
-            is_index: false,
-        });
-        number += 1;
+        let num_cycles = value.into_number() as i32;
+        if num_cycles != 0 {
+            reads.push(ReadDescription {
+                number: number,
+                num_cycles: num_cycles,
+                is_index: false,
+            });
+            number += 1;
+        }
     }
 
     if let Ok(value) = evaluate_xpath(&info_doc, "//PlannedIndex1ReadCycles/text()") {
-        reads.push(ReadDescription {
-            number: number,
-            num_cycles: value.into_number() as i32,
-            is_index: true,
-        });
-        number += 1;
+        let num_cycles = value.into_number() as i32;
+        if num_cycles != 0 {
+            reads.push(ReadDescription {
+                number: number,
+                num_cycles: num_cycles,
+                is_index: true,
+            });
+            number += 1;
+        }
+    }
+
+    if let Ok(value) = evaluate_xpath(&info_doc, "//PlannedRead2Cycles/text()") {
+        let num_cycles = value.into_number() as i32;
+        if num_cycles != 0 {
+            reads.push(ReadDescription {
+                number: number,
+                num_cycles: num_cycles,
+                is_index: false,
+            });
+            number += 1;
+        }
     }
 
     if let Ok(value) = evaluate_xpath(&info_doc, "//PlannedIndex2ReadCycles/text()") {
-        reads.push(ReadDescription {
-            number: number,
-            num_cycles: value.into_number() as i32,
-            is_index: true,
-        });
+        let num_cycles = value.into_number() as i32;
+        if num_cycles != 0 {
+            reads.push(ReadDescription {
+                number: number,
+                num_cycles: num_cycles,
+                is_index: true,
+            });
+        }
     }
 
     Ok(RunParameters {
@@ -385,9 +403,28 @@ fn process_xml(
     Ok((run_info, run_params))
 }
 
+fn get_status_sequencing(
+    run_info: &RunInfo,
+    run_params: &RunParameters,
+    path: &Path,
+    current_status: &str,
+) -> String {
+    if current_status == "closed" || current_status == "failed" || current_status == "complete" {
+        return current_status.to_string();
+    } else if run_info.reads != run_params.planned_reads {
+        return "failed".to_string();
+    } else if path.join("RTAComplete.txt").exists() {
+        return "complete".to_string();
+    } else {
+        return "in_progress".to_string();
+    }
+}
+
 fn build_flow_cell(
     run_info: &RunInfo,
     run_params: &RunParameters,
+    path: &Path,
+    status_sequencing: Option<String>,
     settings: &Settings,
 ) -> api::FlowCell {
     api::FlowCell {
@@ -409,7 +446,12 @@ fn build_flow_cell(
         description: None,
         sequencing_machine: run_info.instrument.clone(),
         operator: Some(settings.ingest.operator.clone()),
-        status_sequencing: "initial".to_string(),
+        status_sequencing: get_status_sequencing(
+            run_info,
+            run_params,
+            path,
+            &status_sequencing.unwrap_or("initial".to_string()),
+        ),
         status_conversion: "initial".to_string(),
         status_delivery: "initial".to_string(),
         delivery_type: "seq".to_string(),
@@ -421,12 +463,13 @@ fn register_flowcell(
     client: &mut RestClient,
     run_info: &RunInfo,
     run_params: &RunParameters,
+    path: &Path,
     settings: &Settings,
 ) -> Result<api::FlowCell> {
     info!(logger, "Registering flow cell...");
 
-    let flowcell = build_flow_cell(run_info, run_params, settings);
-    debug!(logger, "Registering flowcell as {:?}", &flowcell);
+    let flowcell = build_flow_cell(run_info, run_params, path, None, settings);
+    debug!(logger, "Registering flowcell with API as {:?}", &flowcell);
 
     let args = api::ProjectArgs {
         project_uuid: settings.ingest.project_uuid.clone(),
@@ -447,18 +490,26 @@ fn update_flowcell(
     flowcell: &api::FlowCell,
     run_info: &RunInfo,
     run_params: &RunParameters,
+    path: &Path,
     settings: &Settings,
 ) -> Result<api::FlowCell> {
     info!(logger, "Updating flow cell...");
 
-    let rebuilt = build_flow_cell(run_info, run_params, settings);
+    let rebuilt = build_flow_cell(
+        run_info,
+        run_params,
+        path,
+        Some(flowcell.status_sequencing.clone()),
+        settings,
+    );
 
     let flowcell = api::FlowCell {
         planned_reads: rebuilt.planned_reads.clone(),
         current_reads: rebuilt.current_reads.clone(),
+        status_sequencing: rebuilt.status_sequencing.clone(),
         ..flowcell.clone()
     };
-    info!(logger, "Will update flow cell");
+    info!(logger, "Updating flow cell via API");
     debug!(logger, "  {:?} => {:?}", &flowcell, &rebuilt);
 
     let args = api::ProjectFlowcellArgs {
@@ -544,8 +595,7 @@ fn analyze_stacks(
                     debug!(logger, "Done processing {}.", &path);
 
                     Ok(chars)
-                })
-                .collect::<Result<Vec<_>>>()?;
+                }).collect::<Result<Vec<_>>>()?;
 
             // Build read sequences.
             debug!(logger, "Building read sequences.");
@@ -558,8 +608,7 @@ fn analyze_stacks(
                         seq.push(bases[j][i]);
                     }
                     seq
-                })
-                .collect::<Vec<String>>();
+                }).collect::<Vec<String>>();
             debug!(logger, "Done building read sequences.");
 
             // TODO: parallelize counting?
@@ -585,8 +634,7 @@ fn analyze_stacks(
                 sample_size: num_seqs,
                 hist: filtered_hist,
             })
-        })
-        .collect()
+        }).collect()
 }
 
 fn find_file_stacks(
@@ -726,6 +774,10 @@ fn analyze_adapters(
 
             // Push results to API
             if settings.ingest.post_adapters {
+                info!(
+                    logger,
+                    "Updating adapter information via API {:?}", &flowcell
+                );
                 for (i, index_info) in index_counts.iter().enumerate() {
                     let lane_no = i + 1;
                     let api_hist = api::LaneIndexHistogram {
@@ -743,8 +795,7 @@ fn analyze_adapters(
                                 flowcell_uuid: flowcell.sodar_uuid.clone().unwrap(),
                             },
                             &api_hist,
-                        )
-                        .chain_err(|| "Could not update adapter on server")?
+                        ).chain_err(|| "Could not update adapter on server")?
                 }
             }
         }
@@ -838,6 +889,7 @@ fn process_folder(logger: &slog::Logger, path: &Path, settings: &Settings) -> Re
                         &flowcell,
                         &run_info,
                         &run_params,
+                        &path,
                         &settings,
                     )?
                 } else {
@@ -847,8 +899,14 @@ fn process_folder(logger: &slog::Logger, path: &Path, settings: &Settings) -> Re
             Err(restson::Error::HttpError(404, _msg)) => {
                 debug!(logger, "Flow cell was not found!");
                 if settings.ingest.register {
-                    let flowcell =
-                        register_flowcell(logger, &mut client, &run_info, &run_params, &settings)?;
+                    let flowcell = register_flowcell(
+                        logger,
+                        &mut client,
+                        &run_info,
+                        &run_params,
+                        &path,
+                        &settings,
+                    )?;
                     debug!(logger, "Flow cell registered as {:?}", &flowcell);
                     flowcell
                 } else {
