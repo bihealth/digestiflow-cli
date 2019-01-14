@@ -1,0 +1,22 @@
+language: rust
+
+rust:
+- stable
+
+cache: cargo
+
+sudo: false
+
+before_script:
+- cargo install --force cargo-travis
+- export PATH=$HOME/.cargo/bin:$PATH
+- rustup component add rustfmt-preview
+
+script:
+- cargo fmt -- --check
+- cargo build
+# - cargo test
+
+env:
+  global:
+    - RUST_BACKTRACE=1
