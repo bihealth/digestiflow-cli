@@ -59,7 +59,7 @@ mod api {
     impl<'a> RestPath<&'a ResolveFlowCellArgs> for FlowCell {
         fn get_path(args: &'a ResolveFlowCellArgs) -> result::Result<String, restson::Error> {
             Ok(format!(
-                "api/flowcells/{}/resolve/{}/{}/{}/",
+                "api/flowcells/resolve/{}/{}/{}/{}/",
                 &args.project_uuid, &args.instrument, args.run_number, &args.flowcell
             ))
         }
