@@ -1,5 +1,5 @@
 [package]
-name = "digestiflow-cli-client"
+name = "digestiflow-cli"
 version = "0.1.0"
 authors = ["Manuel Holtgrewe <manuel.holtgrewe@bihealth.de>"]
 

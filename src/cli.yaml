@@ -1,4 +1,4 @@
-name: digestiflow-cli-client
+name: digestiflow-cli
 version: 0.1.0
 about: CLI Client for Digestiflow
 author: Manuel Holtgrewe <manuel.holtgrewe@bihealth.de>

@@ -1,3 +1,5 @@
+//! Implementation of flow cell folder analysis and import.
+
 use byteorder::{LittleEndian, ReadBytesExt};
 use flate2::read::MultiGzDecoder;
 use glob::glob;
@@ -360,7 +362,7 @@ fn process_xml_param_doc_miniseq(info_doc: &Document) -> Result<RunParameters> {
                 num_cycles: num_cycles,
                 is_index: false,
             });
-            number += 1;
+            // number += 1;
         }
     }
 

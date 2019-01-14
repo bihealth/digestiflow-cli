@@ -1,3 +1,8 @@
+//! The Digestiflow CLI main program.
+//!
+//! The code in this module parses the command line, sets up logging, and then dispatches to the
+//! sub modules implementing the commands.
+
 // `error_chain!` can recurse deeply.
 #![recursion_limit = "1024"]
 
@@ -35,6 +40,7 @@ use std::result;
 use std::sync::atomic::Ordering;
 use std::sync::{atomic, Arc};
 
+/// Global module with error handlers.
 mod errors {
     // Create the Error, ErrorKind, ResultExt, and Result types
     error_chain!{}
@@ -78,6 +84,7 @@ where
     }
 }
 
+/// Program entry point after using `clap` for parsing command line arguments, called by `main()`.
 fn run(matches: ArgMatches) -> Result<()> {
     // Logging setup ------------------------------------------------------------------------------
 
@@ -122,6 +129,7 @@ fn run(matches: ArgMatches) -> Result<()> {
     Ok(())
 }
 
+/// Main entry point.
 fn main() {
     let yaml = load_yaml!("cli.yaml");
     let matches = App::from_yaml(yaml).get_matches();
