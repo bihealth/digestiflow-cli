@@ -174,7 +174,8 @@ fn analyze_adapters(
                                 flowcell_uuid: flowcell.sodar_uuid.clone().unwrap(),
                             },
                             &api_hist,
-                        ).chain_err(|| "Could not update adapter on server")?
+                        )
+                        .chain_err(|| "Could not update adapter on server")?
                 }
             }
         }

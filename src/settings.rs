@@ -139,7 +139,8 @@ impl Settings {
             .set_default(
                 "ingest.skip_if_status_final",
                 default.ingest.skip_if_status_final,
-            )?.set_default(
+            )?
+            .set_default(
                 "ingest.sample_reads_per_tile",
                 default.ingest.sample_reads_per_tile as i64,
             )?;

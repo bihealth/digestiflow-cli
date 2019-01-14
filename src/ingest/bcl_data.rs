@@ -90,7 +90,8 @@ pub fn analyze_stacks(
                     debug!(logger, "Done processing {}.", &path);
 
                     Ok(chars)
-                }).collect::<Result<Vec<_>>>()?;
+                })
+                .collect::<Result<Vec<_>>>()?;
 
             // Build read sequences.
             debug!(logger, "Building read sequences.");
@@ -103,7 +104,8 @@ pub fn analyze_stacks(
                         seq.push(bases[j][i]);
                     }
                     seq
-                }).collect::<Vec<String>>();
+                })
+                .collect::<Vec<String>>();
             debug!(logger, "Done building read sequences.");
 
             // TODO: parallelize counting?
@@ -129,7 +131,8 @@ pub fn analyze_stacks(
                 sample_size: num_seqs,
                 hist: filtered_hist,
             })
-        }).collect()
+        })
+        .collect()
 }
 
 pub fn find_file_stacks(

@@ -43,7 +43,7 @@ use std::sync::{atomic, Arc};
 /// Global module with error handlers.
 mod errors {
     // Create the Error, ErrorKind, ResultExt, and Result types
-    error_chain!{}
+    error_chain! {}
 }
 
 pub use errors::*;
@@ -97,7 +97,8 @@ fn run(matches: ArgMatches) -> Result<()> {
     let drain = RuntimeLevelFilter {
         drain: drain,
         log_level: log_level.clone(),
-    }.fuse();
+    }
+    .fuse();
     let drain = slog_async::Async::new(drain).build().fuse();
 
     let logger = slog::Logger::root(drain, o!());
@@ -120,7 +121,8 @@ fn run(matches: ArgMatches) -> Result<()> {
         ("ingest", Some(_m)) => ingest::run(
             &logger,
             &Settings::new(&matches).expect("Problem with obtaining configuration"),
-        ).chain_err(|| "Could not execute 'ingest' command")?,
+        )
+        .chain_err(|| "Could not execute 'ingest' command")?,
         _ => bail!("Invalid command: {}", matches.subcommand().0),
     }
 
