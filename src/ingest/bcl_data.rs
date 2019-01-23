@@ -119,7 +119,7 @@ pub fn analyze_stacks(
             // Filter to top 1%.
             let mut filtered_hist = HashMap::new();
             for (seq, count) in hist {
-                if count > num_seqs / 100 {
+                if count as f64 > (num_seqs as f64) * settings.ingest.min_index_fraction {
                     filtered_hist.insert(seq.clone(), count);
                 }
             }

@@ -86,3 +86,9 @@ subcommands:
         value_name: COUNT
         required: false
         help: Number of reads to sample per tile
+    - min_index_fraction:
+        long: min-index-fraction
+        takes_value: true
+        value_name: FRAC
+        required: false
+        help: Minimal fraction of reads that must show index for index histogram to be computed

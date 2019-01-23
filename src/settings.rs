@@ -50,6 +50,8 @@ pub struct IngestArgs {
     pub sample_reads_per_tile: i32,
     /// Skip if sequencing status is a final state.
     pub skip_if_status_final: bool,
+    /// Minimum fraction of reads to show an index for index histogram to be computed.
+    pub min_index_fraction: f64,
 }
 
 impl Default for IngestArgs {
@@ -66,6 +68,7 @@ impl Default for IngestArgs {
             sample_tiles: 1,
             sample_reads_per_tile: 0,
             skip_if_status_final: true,
+            min_index_fraction: 0.001,
         };
     }
 }
@@ -137,6 +140,10 @@ impl Settings {
             .set_default("ingest.operator", default.ingest.operator)?
             .set_default("ingest.sample_tiles", default.ingest.sample_tiles as i64)?
             .set_default(
+                "ingest.min_index_fraction",
+                default.ingest.min_index_fraction,
+            )?
+            .set_default(
                 "ingest.skip_if_status_final",
                 default.ingest.skip_if_status_final,
             )?
@@ -205,6 +212,9 @@ impl Settings {
                 }
                 if m.is_present("analyze_if_state_final") {
                     s.set("ingest.skip_if_status_final", false)?;
+                }
+                if m.is_present("min_index_fraction") {
+                    s.set("ingest.min_inde_fraction", m.value_of("min_index_fraction"))?;
                 }
             }
             _ => {
