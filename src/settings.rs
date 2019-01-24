@@ -221,7 +221,7 @@ impl Settings {
                 return Err(ConfigError::Message(format!(
                     "Invalid command {}",
                     matches.subcommand().0
-                )))
+                )));
             }
         }
 
