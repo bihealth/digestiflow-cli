@@ -40,6 +40,8 @@ pub struct IngestArgs {
     pub update: bool,
     /// Whether or not to compute adapter sequence histograms.
     pub analyze_adapters: bool,
+    /// Whether or not to to force adapter sequence histogram computation.
+    pub force_analyze_adapters: bool,
     /// Whether or not to post adapter sequence histogram via API.
     pub post_adapters: bool,
     /// String to use for machine operator when creating flow cell via API.
@@ -63,6 +65,7 @@ impl Default for IngestArgs {
             register: true,
             update: true,
             analyze_adapters: true,
+            force_analyze_adapters: false,
             post_adapters: true,
             operator: "".to_string(),
             sample_tiles: 1,
@@ -136,6 +139,10 @@ impl Settings {
             .set_default("ingest.register", default.ingest.register)?
             .set_default("ingest.update", default.ingest.update)?
             .set_default("ingest.analyze_adapters", default.ingest.analyze_adapters)?
+            .set_default(
+                "ingest.force_analyze_adapters",
+                default.ingest.force_analyze_adapters,
+            )?
             .set_default("ingest.post_adapters", default.ingest.post_adapters)?
             .set_default("ingest.operator", default.ingest.operator)?
             .set_default("ingest.sample_tiles", default.ingest.sample_tiles as i64)?
@@ -201,6 +208,9 @@ impl Settings {
                 if m.is_present("analyze_adapters") {
                     s.set("ingest.analyze_adapters", true)?;
                 }
+                if m.is_present("force_analyze_adapters") {
+                    s.set("ingest.force_analyze_adapters", true)?;
+                }
                 if m.is_present("post_adapters") {
                     s.set("ingest.post_adapters", true)?;
                 }
@@ -210,7 +220,7 @@ impl Settings {
                         m.value_of("sample_reads_per_tile"),
                     )?;
                 }
-                if m.is_present("analyze_if_state_final") {
+                if m.is_present("update_if_state_final") {
                     s.set("ingest.skip_if_status_final", false)?;
                 }
                 if m.is_present("min_index_fraction") {

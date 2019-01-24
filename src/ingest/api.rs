@@ -78,10 +78,27 @@ pub struct LaneIndexHistogram {
     pub lane: i32,
     pub index_read_no: i32,
     pub sample_size: usize,
+    pub min_index_fraction: f64,
     pub histogram: HashMap<String, usize>,
 }
 
 impl<'a> RestPath<&'a ProjectFlowcellArgs> for LaneIndexHistogram {
+    fn get_path(args: &'a ProjectFlowcellArgs) -> result::Result<String, restson::Error> {
+        Ok(format!(
+            "api/indexhistos/{}/{}/",
+            &args.project_uuid, &args.flowcell_uuid
+        ))
+    }
+}
+
+/// Querying index histogram list from DigestiFlow API.
+#[derive(Deserialize, Debug)]
+#[serde(untagged)]
+pub enum LaneIndexHistogramArray {
+    Array(Vec<LaneIndexHistogram>),
+}
+
+impl<'a> RestPath<&'a ProjectFlowcellArgs> for LaneIndexHistogramArray {
     fn get_path(args: &'a ProjectFlowcellArgs) -> result::Result<String, restson::Error> {
         Ok(format!(
             "api/indexhistos/{}/{}/",

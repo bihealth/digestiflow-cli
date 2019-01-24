@@ -134,48 +134,95 @@ fn analyze_adapters(
     folder_layout: FolderLayout,
     settings: &Settings,
 ) -> Result<()> {
-    info!(logger, "Analyzing adapters...");
-
     let mut index_no = 0i32;
     let mut cycle = 1i32; // always throw away first cycle
     for ref desc in &run_info.reads {
         if desc.is_index {
             index_no += 1;
-            let index_counts = sample_adapters(
-                logger,
-                path,
-                &desc,
-                folder_layout,
-                settings,
-                index_no,
-                cycle,
-            )?;
 
-            // Push results to API
-            if settings.ingest.post_adapters {
+            // Get existing index histograms.
+            info!(
+                logger,
+                "Getting existing index histograms for flow cell from API"
+            );
+            let hist_arr: api::LaneIndexHistogramArray = client
+                .get(&api::ProjectFlowcellArgs {
+                    project_uuid: settings.ingest.project_uuid.clone(),
+                    flowcell_uuid: flowcell.sodar_uuid.clone().unwrap(),
+                })
+                .chain_err(|| "Could not query index histograms from server")?;
+            let num_hists = match &hist_arr {
+                api::LaneIndexHistogramArray::Array(hists) => {
+                    info!(
+                        logger,
+                        "=> flow cell has {} histograms already",
+                        hists.len()
+                    );
+                    hists.len()
+                }
+            };
+
+            // Number of adapters that are expected.  Will only analyzes
+            let expected_adapters = flowcell.num_lanes as usize
+                * flowcell
+                    .planned_reads
+                    .clone()
+                    .unwrap()
+                    .chars()
+                    .filter(|x| *x == 'B')
+                    .count();
+            debug!(logger, "expected adapters: {}", expected_adapters);
+
+            if num_hists == expected_adapters && !settings.ingest.force_analyze_adapters {
                 info!(
                     logger,
-                    "Updating adapter information via API {:?}", &flowcell
+                    "There already is the expected number of adapters in the API ({}) \
+                     and you did not force analyzing of adapters. NOT analysing adapters.",
+                    expected_adapters
                 );
-                for (i, index_info) in index_counts.iter().enumerate() {
-                    let lane_no = i + 1;
-                    let api_hist = api::LaneIndexHistogram {
-                        sodar_uuid: None,
-                        flowcell: flowcell.sodar_uuid.clone().unwrap(),
-                        lane: lane_no as i32,
-                        index_read_no: index_no,
-                        sample_size: index_info.sample_size,
-                        histogram: index_info.hist.clone(),
-                    };
-                    client
-                        .post(
-                            &api::ProjectFlowcellArgs {
-                                project_uuid: settings.ingest.project_uuid.clone(),
-                                flowcell_uuid: flowcell.sodar_uuid.clone().unwrap(),
-                            },
-                            &api_hist,
-                        )
-                        .chain_err(|| "Could not update adapter on server")?
+            } else {
+                if num_hists == expected_adapters {
+                    info!(logger, "You are enforcing the analysis of adapters regardless of existing ones in API...")
+                }
+                info!(logger, "Analyzing adapters...");
+                let index_counts = sample_adapters(
+                    logger,
+                    path,
+                    &desc,
+                    folder_layout,
+                    settings,
+                    index_no,
+                    cycle,
+                )?;
+
+                // Push results to API
+                if settings.ingest.post_adapters {
+                    info!(
+                        logger,
+                        "Updating adapter information via API {:?}", &flowcell
+                    );
+                    for (i, index_info) in index_counts.iter().enumerate() {
+                        let lane_no = i + 1;
+                        let api_hist = api::LaneIndexHistogram {
+                            sodar_uuid: None,
+                            flowcell: flowcell.sodar_uuid.clone().unwrap(),
+                            lane: lane_no as i32,
+                            index_read_no: index_no,
+                            min_index_fraction: settings.ingest.min_index_fraction,
+                            sample_size: index_info.sample_size,
+                            histogram: index_info.hist.clone(),
+                        };
+                        debug!(logger, "Posting {:?}", &api_hist);
+                        client
+                            .post(
+                                &api::ProjectFlowcellArgs {
+                                    project_uuid: settings.ingest.project_uuid.clone(),
+                                    flowcell_uuid: flowcell.sodar_uuid.clone().unwrap(),
+                                },
+                                &api_hist,
+                            )
+                            .chain_err(|| "Could not update adapter on server")?
+                    }
                 }
             }
         }
@@ -265,15 +312,30 @@ fn process_folder(logger: &slog::Logger, path: &Path, settings: &Settings) -> Re
             Ok(flowcell) => {
                 debug!(logger, "Flow cell found with value {:?}", &flowcell);
                 if settings.ingest.update {
-                    update_flowcell(
-                        logger,
-                        &mut client,
-                        &flowcell,
-                        &run_info,
-                        &run_params,
-                        &path,
-                        &settings,
-                    )?
+                    if flowcell.status_sequencing != "initial"
+                        && flowcell.status_sequencing != "in_progress"
+                    {
+                        if settings.ingest.skip_if_status_final {
+                            info!(
+                                logger,
+                                "Flowcell has a final sequencing status ({:?}), skippping",
+                                &flowcell.status_sequencing
+                            );
+                            flowcell
+                        } else {
+                            update_flowcell(
+                                logger,
+                                &mut client,
+                                &flowcell,
+                                &run_info,
+                                &run_params,
+                                &path,
+                                &settings,
+                            )?
+                        }
+                    } else {
+                        flowcell
+                    }
                 } else {
                     flowcell
                 }
@@ -309,17 +371,6 @@ fn process_folder(logger: &slog::Logger, path: &Path, settings: &Settings) -> Re
     };
 
     // Check if we should skip this directory.
-    if flowcell.status_sequencing != "initial" && flowcell.status_sequencing != "in_progress" {
-        if settings.ingest.skip_if_status_final {
-            info!(
-                logger,
-                "Flowcell has a final sequencing status ({:?}), skippping",
-                &flowcell.status_sequencing
-            );
-            return Ok(());
-        }
-    }
-
     if settings.ingest.analyze_adapters {
         analyze_adapters(
             logger,

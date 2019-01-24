@@ -65,11 +65,13 @@ subcommands:
         takes_value: false
         required: false
         help: Whether or not to register flow cell via the API.
-    - analyze_if_state_final:
-        long: analyze-if-state-final
+    - update_if_state_final:
+        long: update-if-state-final
         takes_value: false
         required: false
-        help: Enforce analysis even sequencing state not initial/in progress any more.
+        help: >
+            Update flow cell information sequencing is in a final state (e.g., completed or
+            failed).  Updating index histograms is separate from this.
     - no_update:
         long: no-update
         takes_value: false
@@ -80,6 +82,13 @@ subcommands:
         takes_value: false
         required: false
         help: Read adapters from binary base call files
+    - force_analyze_adapters:
+        long: force-analyze-adapters
+        takes_value: false
+        required: false
+        help: >
+            Force analysis of adapters even if adapter histogram information is present for
+            all index reads.
     - sample_reads_per_tile:
         long: sample-reads-per-tile
         takes_value: true

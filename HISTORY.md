@@ -2,6 +2,11 @@
 
 ## HEAD (unreleased)
 
+- Adjusting update behaviour, changes command line.
+- Updated formatting to new `rust-fmt` version.
+
+## v0.2.0
+
 - Registring indices seen in >0.1% of all reads by default now.
 - Allowing to configure minimal fraction of reads to show an index for index to turn up in histogram.
 
