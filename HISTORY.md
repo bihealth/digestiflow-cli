@@ -1,6 +1,6 @@
 # Digestiflow CLI Client Changelog
 
-## HEAD (unreleased)
+## v0.3.0
 
 - Updating `README.md` with most current information.
 - Adjusting update behaviour, changes command line.

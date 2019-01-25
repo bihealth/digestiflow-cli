@@ -1,5 +1,5 @@
 [![Bioconda](https://img.shields.io/conda/dn/bioconda/digestiflow-cli.svg?label=Bioconda)](https://bioconda.github.io/recipes/digestiflow-cli/README.html)
-[![Build Status](https://travis-ci.org/bihealth/digestiflow-cli.svg?branch=master)](https://travis-ci.org/bihealth/digestiflow)
+[![Build Status](https://travis-ci.org/bihealth/digestiflow-cli.svg?branch=master)](https://travis-ci.org/bihealth/digestiflow-cli)
 
 # Digestfilow CLI Client
 
