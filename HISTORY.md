@@ -2,6 +2,7 @@
 
 ## HEAD (unreleased)
 
+- Updating `README.md` with most current information.
 - Adjusting update behaviour, changes command line.
 - Updated formatting to new `rust-fmt` version.
 
