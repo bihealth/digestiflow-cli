@@ -1,6 +1,6 @@
 # Digestiflow CLI Client Changelog
 
-## HEAD (unreleased)
+## v0.4.0
 
 - Removing number of REST client creations (to work around some DNS limitations).
 - Setting default number of reads to analyze per tile to 1M.
