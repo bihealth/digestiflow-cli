@@ -234,7 +234,12 @@ fn analyze_adapters(
 }
 
 /// Process the sequencer output folder at `path` with the given `settings`.
-fn process_folder(logger: &slog::Logger, path: &Path, settings: &Settings) -> Result<()> {
+fn process_folder(
+    logger: &slog::Logger,
+    path: &Path,
+    client: &mut RestClient,
+    settings: &Settings,
+) -> Result<()> {
     info!(logger, "Starting to process folder {:?}...", path);
 
     // Ensure that `RunInfo.xml` exists and try to guess folder layout.
@@ -298,10 +303,6 @@ fn process_folder(logger: &slog::Logger, path: &Path, settings: &Settings) -> Re
             "  (using header 'Authorization: Token {}')", &settings.web.token
         );
     }
-    let mut client = RestClient::new(&settings.web.url).unwrap();
-    client
-        .set_header("Authorization", &format!("Token {}", &settings.web.token))
-        .chain_err(|| "Problem configuring REST client")?;
     let result: result::Result<api::FlowCell, restson::Error> =
         client.get(&api::ResolveFlowCellArgs {
             project_uuid: settings.ingest.project_uuid.clone(),
@@ -329,7 +330,7 @@ fn process_folder(logger: &slog::Logger, path: &Path, settings: &Settings) -> Re
                         } else {
                             update_flowcell(
                                 logger,
-                                &mut client,
+                                client,
                                 &flowcell,
                                 &run_info,
                                 &run_params,
@@ -349,7 +350,7 @@ fn process_folder(logger: &slog::Logger, path: &Path, settings: &Settings) -> Re
                 if settings.ingest.register {
                     let flowcell = register_flowcell(
                         logger,
-                        &mut client,
+                        client,
                         &run_info,
                         &run_params,
                         &path,
@@ -379,7 +380,7 @@ fn process_folder(logger: &slog::Logger, path: &Path, settings: &Settings) -> Re
         analyze_adapters(
             logger,
             &flowcell,
-            &mut client,
+            client,
             &run_info,
             &path,
             folder_layout,
@@ -411,21 +412,33 @@ pub fn run(logger: &slog::Logger, settings: &Settings) -> Result<()> {
     debug!(logger, "Using {} threads", settings.threads);
     env::set_var("RAYON_NUM_THREADS", format!("{}", settings.threads));
 
-    let num_failed = settings.ingest.path./*par_*/iter().map(|ref path| {
-        let path = Path::new(path);
-        match process_folder(logger, &path, settings) {
-            Err(_e) => {
-                warn!(
+    // Create shared client.
+    let mut client = RestClient::new(&settings.web.url).unwrap();
+    client
+        .set_header("Authorization", &format!("Token {}", &settings.web.token))
+        .chain_err(|| "Problem configuring REST client")?;
+
+    let num_failed = settings
+        .ingest
+        .path
+        .iter()
+        .map(|ref path| {
+            let path = Path::new(path);
+            match process_folder(logger, &path, &mut client, settings) {
+                Err(_e) => {
+                    warn!(
                     logger,
                     "Processing folder {:?} failed. Will go on with other paths but the program \
                      call will not have return code 0!",
                     &path
                 );
-                true // == any failed
+                    true // == any failed
+                }
+                _ => false, // == any failed
             }
-            _ => false,  // == any failed
-        }
-    }).filter(|failed| failed).count();
+        })
+        .filter(|failed| *failed)
+        .count();
 
     if num_failed > 0 {
         bail!("Processing of at {} folders failed!", num_failed)

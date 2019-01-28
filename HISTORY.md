@@ -2,6 +2,8 @@
 
 ## HEAD (unreleased)
 
+- Removing number of REST client creations (to work around some DNS limitations).
+- Setting default number of reads to analyze per tile to 1M.
 - Adding support for uncompressed BCL files.
 
 ## v0.3.0

@@ -69,7 +69,7 @@ impl Default for IngestArgs {
             post_adapters: true,
             operator: "".to_string(),
             sample_tiles: 1,
-            sample_reads_per_tile: 0,
+            sample_reads_per_tile: 1_000_000,
             skip_if_status_final: true,
             min_index_fraction: 0.001,
         };
