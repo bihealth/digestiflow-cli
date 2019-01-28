@@ -38,6 +38,56 @@ pub struct IndexCounts {
     pub hist: HashMap<String, usize>,
 }
 
+/// Load compressed BCL file.
+fn load_bcl_gz(logger: &slog::Logger, path: &str, settings: &Settings) -> Result<Vec<u8>> {
+    // Open file
+    debug!(logger, "Processing compressed BCL file {}...", &path);
+    let file = File::open(&path).chain_err(|| "Problem opening gzip file")?;
+    let mut gz_decoder = MultiGzDecoder::new(file);
+
+    // Read number of bytes in file.
+    let num_bytes = gz_decoder
+        .read_u32::<LittleEndian>()
+        .chain_err(|| "Problem reading byte count")? as usize;
+
+    // Read array with bases and quality values.
+    let num_bytes = if settings.ingest.sample_reads_per_tile > 0 {
+        cmp::min(num_bytes, settings.ingest.sample_reads_per_tile as usize)
+    } else {
+        num_bytes
+    };
+    let mut buf = vec![0u8; num_bytes];
+    gz_decoder
+        .read_exact(&mut buf)
+        .chain_err(|| "Problem reading payload")?;
+
+    Ok(buf)
+}
+
+/// Load compressed BCL file.
+fn load_bcl(logger: &slog::Logger, path: &str, settings: &Settings) -> Result<Vec<u8>> {
+    // Open file
+    debug!(logger, "Processing uncompressed BCL file {}...", &path);
+    let mut file = File::open(&path).chain_err(|| "Problem opening BCL file")?;
+
+    // Read number of bytes in file.
+    let num_bytes = file
+        .read_u32::<LittleEndian>()
+        .chain_err(|| "Problem reading byte count")? as usize;
+
+    // Read array with bases and quality values.
+    let num_bytes = if settings.ingest.sample_reads_per_tile > 0 {
+        cmp::min(num_bytes, settings.ingest.sample_reads_per_tile as usize)
+    } else {
+        num_bytes
+    };
+    let mut buf = vec![0u8; num_bytes];
+    file.read_exact(&mut buf)
+        .chain_err(|| "Problem reading payload")?;
+
+    Ok(buf)
+}
+
 /// Analyze a single stack.
 pub fn analyze_stacks(
     logger: &slog::Logger,
@@ -55,32 +105,17 @@ pub fn analyze_stacks(
                 .paths
                 .par_iter()
                 .map(|ref path| {
-                    // Open file
-                    debug!(logger, "Processing file {}...", &path);
-                    let file = File::open(&path).chain_err(|| "Problem opening gzip file")?;
-                    let mut gz_decoder = MultiGzDecoder::new(file);
-
-                    // Read number of bytes in file.
-                    let num_bytes = gz_decoder
-                        .read_u32::<LittleEndian>()
-                        .chain_err(|| "Problem reading byte count")?
-                        as usize;
-
-                    // Read array with bases and quality values.
-                    let num_bytes = if settings.ingest.sample_reads_per_tile > 0 {
-                        cmp::min(num_bytes, settings.ingest.sample_reads_per_tile as usize)
+                    let buf = if path.ends_with(".gz") || path.ends_with(".bgzf") {
+                        load_bcl_gz(logger, &path, settings)
                     } else {
-                        num_bytes
-                    };
-                    let mut buf = vec![0u8; num_bytes];
-                    gz_decoder
-                        .read_exact(&mut buf)
-                        .chain_err(|| "Problem reading payload")?;
+                        load_bcl(logger, &path, settings)
+                    }
+                    .chain_err(|| "Problem loading BCL file.")?;
 
                     // Build bases for each spot, use no-call if all bits are unset.
                     let table = vec!['A', 'C', 'G', 'T'];
                     let mut chars = Vec::new();
-                    for i in 0..num_bytes {
+                    for i in 0..buf.len() {
                         if buf[i] == 0 {
                             chars.push('N');
                         } else {
@@ -188,21 +223,25 @@ pub fn find_file_stacks(
             let mut tile_stacks = Vec::new();
             for (lane_no, ref lane_path) in lane_paths.iter().enumerate() {
                 let mut lane_stacks = Vec::new();
-                let path = Path::new(lane_path).join("C1.1").join("s_?_????.bcl.gz");
-                for prototype in glob(path.to_str().unwrap()).unwrap() {
-                    let path = prototype.unwrap();
-                    let file_name = path.file_name().unwrap();
-                    let mut paths: Vec<String> = Vec::new();
-                    for cycle in start_cycle..(start_cycle + desc.num_cycles) {
-                        let path = Path::new(lane_path)
-                            .join(format!("C{}.1", cycle))
-                            .join(file_name);
-                        paths.push(path.to_str().unwrap().to_string());
+                for suffix in &["", ".gz"] {
+                    let path = Path::new(lane_path)
+                        .join("C1.1")
+                        .join(format!("s_?_????.bcl{}", &suffix));
+                    for prototype in glob(path.to_str().unwrap()).unwrap() {
+                        let path = prototype.unwrap();
+                        let file_name = path.file_name().unwrap();
+                        let mut paths: Vec<String> = Vec::new();
+                        for cycle in start_cycle..(start_cycle + desc.num_cycles) {
+                            let path = Path::new(lane_path)
+                                .join(format!("C{}.1", cycle))
+                                .join(file_name);
+                            paths.push(path.to_str().unwrap().to_string());
+                        }
+                        lane_stacks.push(TileBclStack {
+                            lane_no: lane_no as i32 + 1,
+                            paths: paths,
+                        });
                     }
-                    lane_stacks.push(TileBclStack {
-                        lane_no: lane_no as i32 + 1,
-                        paths: paths,
-                    });
                 }
                 tile_stacks.push(lane_stacks);
             }

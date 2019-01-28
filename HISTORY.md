@@ -1,5 +1,9 @@
 # Digestiflow CLI Client Changelog
 
+## HEAD (unreleased)
+
+- Adding support for uncompressed BCL files.
+
 ## v0.3.0
 
 - Updating `README.md` with most current information.

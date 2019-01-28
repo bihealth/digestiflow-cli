@@ -246,12 +246,16 @@ fn process_folder(logger: &slog::Logger, path: &Path, settings: &Settings) -> Re
         bail!("RunInfo.xml missing");
     }
     let folder_layout = match guess_folder_layout(path) {
-        Ok(layout) => layout,
+        Ok(layout) => {
+            info!(logger, "Guessed folder layout to be {:?}", layout);
+            layout
+        }
         Err(_e) => {
-            error!(
+            warn!(
                 logger,
                 "Could not guess folder layout from {:?}. Skipping.", path
             );
+
             bail!("Could not guess folder layout");
         }
     };
@@ -407,11 +411,10 @@ pub fn run(logger: &slog::Logger, settings: &Settings) -> Result<()> {
     debug!(logger, "Using {} threads", settings.threads);
     env::set_var("RAYON_NUM_THREADS", format!("{}", settings.threads));
 
-    let any_failed: bool = settings.ingest.path./*par_*/iter().map(|ref path| {
+    let num_failed = settings.ingest.path./*par_*/iter().map(|ref path| {
         let path = Path::new(path);
         match process_folder(logger, &path, settings) {
-            Err(e) => {
-                error!(logger, "Folder processing failed: {:?}", &e);
+            Err(_e) => {
                 warn!(
                     logger,
                     "Processing folder {:?} failed. Will go on with other paths but the program \
@@ -422,10 +425,10 @@ pub fn run(logger: &slog::Logger, settings: &Settings) -> Result<()> {
             }
             _ => false,  // == any failed
         }
-    }).any(|failed| failed);
+    }).filter(|failed| failed).count();
 
-    if any_failed {
-        bail!("Processing of at least one folder failed!")
+    if num_failed > 0 {
+        bail!("Processing of at {} folders failed!", num_failed)
     } else {
         Ok(())
     }
