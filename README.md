@@ -6,6 +6,10 @@
 The aim of this project is to provide a command line client for controlling Digestiflow via its REST API.
 At the moment, the client only allows to create and update flow cell objects in Digestiflow Web from reading the directories created by Illumina sequencers.
 
+## Installation
+
+The recommended way is to install the `digestiflow-cli` package from Bioconda.
+
 ## Usage
 
 This assumes that you already have installed Digestiflow Web.
@@ -37,7 +41,7 @@ analyze_adapters = true
 To import the flow cells below `PATH` and `PATH2` into the project with UUID `UUID`, use the following command.
 
 ```bash
-digestiflow-cli ingest --project-uuid --project UUID PATH PATH2
+digestiflow-cli ingest --project-uuid --project UUID PATH [PATH2 ...]
 ```
 
 The command line help is available through
