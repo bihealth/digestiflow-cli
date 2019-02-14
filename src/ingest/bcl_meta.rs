@@ -1,5 +1,6 @@
 //! Code for accessing data in the raw output directories.
 
+use chrono::{NaiveDate, NaiveDateTime};
 use std::path::Path;
 use sxd_document::dom::Document;
 use sxd_xpath::nodeset::Node;
@@ -7,7 +8,7 @@ use sxd_xpath::{evaluate_xpath, Value};
 
 use super::super::errors::*;
 
-#[derive(Debug, Copy, Clone)]
+#[derive(PartialEq, Eq, Debug, Copy, Clone)]
 pub enum FolderLayout {
     /// MiSeq, HiSeq 2000, etc. `runParameters.xml`
     MiSeq,
@@ -15,28 +16,48 @@ pub enum FolderLayout {
     MiniSeq,
     /// HiSeq X
     HiSeqX,
+    /// NovaSeq
+    NovaSeq,
 }
 
 pub fn guess_folder_layout(path: &Path) -> Result<FolderLayout> {
-    let miseq_marker = path
-        .join("Data")
-        .join("Intensities")
-        .join("BaseCalls")
-        .join("L001")
-        .join("C1.1");
-    let hiseqx_marker = path.join("Data").join("Intensities").join("s.locs");
-    let miniseq_marker = path
-        .join("Data")
-        .join("Intensities")
-        .join("BaseCalls")
-        .join("L001");
+    let miniseq_markers = vec![
+        path.join("Data")
+            .join("Intensities")
+            .join("BaseCalls")
+            .join("L001"),
+        path.join("RunParameters.xml"),
+    ];
+    let miseq_marker = vec![
+        path.join("Data")
+            .join("Intensities")
+            .join("BaseCalls")
+            .join("L001")
+            .join("C1.1"),
+        path.join("runParameters.xml"),
+    ];
+    let hiseqx_marker = vec![
+        path.join("Data").join("Intensities").join("s.locs"),
+        path.join("RunParameters.xml"),
+    ];
+    let novaseq_marker = vec![
+        path.join("Data")
+            .join("Intensities")
+            .join("BaseCalls")
+            .join("L001")
+            .join("C1.1")
+            .join("L001_1.cbcl"),
+        path.join("RunParameters.xml"),
+    ];
 
-    if miseq_marker.exists() {
+    if novaseq_marker.iter().all(|ref m| m.exists()) {
+        Ok(FolderLayout::NovaSeq)
+    } else if miseq_marker.iter().all(|ref m| m.exists()) {
         Ok(FolderLayout::MiSeq)
-    } else if hiseqx_marker.exists() {
-        Ok(FolderLayout::HiSeqX)
-    } else if miniseq_marker.exists() {
+    } else if miniseq_markers.iter().all(|ref m| m.exists()) {
         Ok(FolderLayout::MiniSeq)
+    } else if hiseqx_marker.iter().all(|ref m| m.exists()) {
+        Ok(FolderLayout::HiSeqX)
     } else {
         bail!("Could not guess folder layout from {:?}", path)
     }
@@ -109,10 +130,18 @@ pub fn process_xml_run_info(info_doc: &Document) -> Result<RunInfo> {
         bail!("Problem getting Read elements")
     };
 
-    let date = evaluate_xpath(&info_doc, "//Date/text()")
+    let xml_date = evaluate_xpath(&info_doc, "//Date/text()")
         .chain_err(|| "Problem reading //Date/text()")?
         .into_string();
-    let date: String = format!("20{}-{}-{}", &date[0..2], &date[2..4], &date[4..6]);
+    let date_string = if let Ok(good) = NaiveDate::parse_from_str(&xml_date, "%y%m%d") {
+        good.format("%F").to_string()
+    } else {
+        if let Ok(good) = NaiveDateTime::parse_from_str(&xml_date, "%-m/%-d/%Y %-I:%M:%S %p") {
+            good.format("%F").to_string()
+        } else {
+            bail!("Could not parse date from string {}", &xml_date);
+        }
+    };
 
     Ok(RunInfo {
         run_id: evaluate_xpath(&info_doc, "//Run/@Id")
@@ -127,7 +156,7 @@ pub fn process_xml_run_info(info_doc: &Document) -> Result<RunInfo> {
         instrument: evaluate_xpath(&info_doc, "//Instrument/text()")
             .chain_err(|| "Problem reading //Instrument/text()")?
             .into_string(),
-        date: date,
+        date: date_string,
         lane_count: evaluate_xpath(&info_doc, "//FlowcellLayout/@LaneCount")
             .chain_err(|| "Problem reading //FlowcellLayout/@LaneCount")?
             .into_number() as i32,
@@ -284,7 +313,7 @@ pub fn process_xml(
 
     let run_params = match folder_layout {
         FolderLayout::MiSeq => process_xml_param_doc_miseq(param_doc)?,
-        FolderLayout::MiniSeq => process_xml_param_doc_miniseq(param_doc)?,
+        FolderLayout::MiniSeq | FolderLayout::NovaSeq => process_xml_param_doc_miniseq(param_doc)?,
         _ => bail!(
             "Don't yet know how to parse folder layout {:?}",
             folder_layout

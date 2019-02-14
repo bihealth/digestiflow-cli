@@ -1,5 +1,10 @@
 # Digestiflow CLI Client Changelog
 
+## v0.4.1
+
+- Allowing parsing of NovaSeq meta data.
+- Note that parsing NovaSeq BCL files does not work yet.
+
 ## v0.4.0
 
 - Removing number of REST client creations (to work around some DNS limitations).

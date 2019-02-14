@@ -1,6 +1,6 @@
 [package]
 name = "digestiflow-cli"
-version = "0.4.0"
+version = "0.4.1"
 authors = ["Manuel Holtgrewe <manuel.holtgrewe@bihealth.de>"]
 
 [dependencies]
@@ -36,3 +36,5 @@ rand_xorshift = "0.1.0"
 rayon = "1.0"
 # Path helper
 shellexpand = "1.0.0"
+# Handling of times
+chrono = "0.4.6"

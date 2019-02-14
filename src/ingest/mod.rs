@@ -134,6 +134,15 @@ fn analyze_adapters(
     folder_layout: FolderLayout,
     settings: &Settings,
 ) -> Result<()> {
+    if folder_layout == FolderLayout::NovaSeq {
+        warn!(
+            logger,
+            "Cannot parse NovaSeq adapters yet. Skipping flow cell. \
+             We're not counting this as an error..."
+        );
+        return Ok(());
+    }
+
     let mut index_no = 0i32;
     let mut cycle = 1i32; // always throw away first cycle
     for ref desc in &run_info.reads {
@@ -281,7 +290,8 @@ fn process_folder(
         let filename = match folder_layout {
             FolderLayout::MiSeq => "runParameters.xml",
             FolderLayout::MiniSeq => "RunParameters.xml",
-            FolderLayout::HiSeqX => bail!("Cannot handle HiSeq X yet!"),
+            FolderLayout::HiSeqX => "RunParameters.xml",
+            FolderLayout::NovaSeq => "RunParameters.xml",
         };
         let mut xmlf = File::open(path.join(filename))
             .chain_err(|| format!("Problem reading {}", &filename))?;
@@ -425,12 +435,13 @@ pub fn run(logger: &slog::Logger, settings: &Settings) -> Result<()> {
         .map(|ref path| {
             let path = Path::new(path);
             match process_folder(logger, &path, &mut client, settings) {
-                Err(_e) => {
+                Err(e) => {
                     warn!(
                     logger,
                     "Processing folder {:?} failed. Will go on with other paths but the program \
-                     call will not have return code 0!",
-                    &path
+                     call will not have return code 0!: {:?}",
+                    &path,
+                    &e
                 );
                     true // == any failed
                 }

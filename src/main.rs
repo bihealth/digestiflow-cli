@@ -9,6 +9,7 @@
 extern crate byteorder;
 #[macro_use]
 extern crate clap;
+extern crate chrono;
 extern crate config;
 #[macro_use]
 extern crate derivative;
