@@ -134,15 +134,6 @@ fn analyze_adapters(
     folder_layout: FolderLayout,
     settings: &Settings,
 ) -> Result<()> {
-    if folder_layout == FolderLayout::NovaSeq {
-        warn!(
-            logger,
-            "Cannot parse NovaSeq adapters yet. Skipping flow cell. \
-             We're not counting this as an error..."
-        );
-        return Ok(());
-    }
-
     let mut index_no = 0i32;
     let mut cycle = 1i32; // always throw away first cycle
     for ref desc in &run_info.reads {

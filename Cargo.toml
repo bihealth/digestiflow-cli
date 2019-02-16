@@ -38,3 +38,5 @@ rayon = "1.0"
 shellexpand = "1.0.0"
 # Handling of times
 chrono = "0.4.6"
+# Regular expressions
+regex = "1.1.0"

@@ -1,5 +1,9 @@
 # Digestiflow CLI Client Changelog
 
+## HEAD (unreleased)
+
+- adding support for CBCL files (e.g., from NovaSeq)
+
 ## v0.4.1
 
 - Allowing parsing of NovaSeq meta data.

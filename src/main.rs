@@ -20,6 +20,7 @@ extern crate glob;
 extern crate rand;
 extern crate rand_xorshift;
 extern crate rayon;
+extern crate regex;
 extern crate restson;
 extern crate serde;
 #[macro_use]
