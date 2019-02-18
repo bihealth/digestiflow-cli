@@ -224,7 +224,7 @@ impl Settings {
                     s.set("ingest.skip_if_status_final", false)?;
                 }
                 if m.is_present("min_index_fraction") {
-                    s.set("ingest.min_inde_fraction", m.value_of("min_index_fraction"))?;
+                    s.set("ingest.min_index_fraction", m.value_of("min_index_fraction"))?;
                 }
             }
             _ => {
