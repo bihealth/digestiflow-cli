@@ -51,7 +51,7 @@ digestiflow-cli --help
 digestiflow-cli ingest --help
 ```
 
-## `digestiflow-ci ingest`
+## `digestiflow-cli ingest`
 
 This command reads is given the UUID of a project in Digestiflow Web and one or more paths to flow cell directories.
 For each of the directories, the tool will do the following:
