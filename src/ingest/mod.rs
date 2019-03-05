@@ -36,11 +36,13 @@ fn build_flow_cell(
         vendor_id: run_info.flowcell.clone(),
         label: Some(run_params.experiment_name.clone()),
         num_lanes: run_info.lane_count,
-        rta_version: if run_params.rta_version.starts_with(&"2") {
-            2
-        } else {
-            1
-        },
+        rta_version: run_params
+            .rta_version
+            .split('.')
+            .next()
+            .expect("Could not get RTA Version")
+            .parse::<i32>()
+            .expect("Could not parse RTA version as integer"),
         planned_reads: Some(string_description(&run_params.planned_reads)),
         current_reads: Some(string_description(&run_info.reads)),
         manual_label: None,

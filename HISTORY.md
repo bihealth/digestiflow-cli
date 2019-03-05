@@ -1,5 +1,9 @@
 # Digestiflow CLI Client Changelog
 
+## v0.5.1
+
+- supporting RTA v3+ by removing some restrictions
+
 ## v0.5.0
 
 - adding support for CBCL files (e.g., from NovaSeq)
