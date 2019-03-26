@@ -342,7 +342,15 @@ fn process_folder(
                             )?
                         }
                     } else {
-                        flowcell
+                        update_flowcell(
+                            logger,
+                            client,
+                            &flowcell,
+                            &run_info,
+                            &run_params,
+                            &path,
+                            &settings,
+                        )?
                     }
                 } else {
                     flowcell
