@@ -414,7 +414,7 @@ pub fn find_file_stacks(
                 for suffix in &["", ".gz"] {
                     let path = Path::new(lane_path)
                         .join("C1.1")
-                        .join(format!("s_?_????.bcl{}", &suffix));
+                        .join(format!("s_?_*.bcl{}", &suffix));
                     for prototype in glob(path.to_str().unwrap()).unwrap() {
                         let path = prototype.unwrap();
                         let file_name = path.file_name().unwrap();

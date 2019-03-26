@@ -1,5 +1,9 @@
 # Digestiflow CLI Client Changelog
 
+## HEAD (unreleased)
+
+- Supporting data generator by relaxing BCL file name pattern.
+
 ## v0.5.1
 
 - supporting RTA v3+ by removing some restrictions
