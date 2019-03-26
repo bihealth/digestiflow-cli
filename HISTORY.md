@@ -1,6 +1,6 @@
 # Digestiflow CLI Client Changelog
 
-## HEAD (unreleased)
+## v0.5.2
 
 - Supporting data generator by relaxing BCL file name pattern.
 - Fixing update logic to ensure things are marked as complete properly.
