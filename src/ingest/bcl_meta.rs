@@ -213,11 +213,20 @@ pub fn process_xml_param_doc_miseq(info_doc: &Document) -> Result<RunParameters>
         bail!("Problem getting Read elements")
     };
 
+    let rta_version = evaluate_xpath(&info_doc, "//RTAVersion/text()")
+        .chain_err(|| "Problem getting RTAVersion element")?
+        .into_string();
+    let rta_version3 = evaluate_xpath(&info_doc, "//RtaVersion/text()")
+        .chain_err(|| "Problem getting RTAVersion element")?
+        .into_string();
+
     Ok(RunParameters {
         planned_reads: reads,
-        rta_version: evaluate_xpath(&info_doc, "//RTAVersion/text()")
-            .chain_err(|| "Problem getting RTAVersion element")?
-            .into_string(),
+        rta_version: if !rta_version3.is_empty() {
+            rta_version3[1..].to_string()
+        } else {
+            rta_version
+        },
         run_number: evaluate_xpath(&info_doc, "//ScanNumber/text()")
             .chain_err(|| "Problem getting ScanNumber element")?
             .into_number() as i32,
@@ -285,11 +294,20 @@ pub fn process_xml_param_doc_miniseq(info_doc: &Document) -> Result<RunParameter
         }
     }
 
+    let rta_version = evaluate_xpath(&info_doc, "//RTAVersion/text()")
+        .chain_err(|| "Problem getting RTAVersion element")?
+        .into_string();
+    let rta_version3 = evaluate_xpath(&info_doc, "//RtaVersion/text()")
+        .chain_err(|| "Problem getting RTAVersion element")?
+        .into_string();
+
     Ok(RunParameters {
         planned_reads: reads,
-        rta_version: evaluate_xpath(&info_doc, "//RTAVersion/text()")
-            .chain_err(|| "Problem getting RTAVersion element")?
-            .into_string(),
+        rta_version: if !rta_version3.is_empty() {
+            rta_version3[1..].to_string()
+        } else {
+            rta_version
+        },
         run_number: evaluate_xpath(&info_doc, "//RunNumber/text()")
             .chain_err(|| "Problem getting RunNumber element")?
             .into_number() as i32,

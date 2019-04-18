@@ -1,5 +1,9 @@
 # Digestiflow CLI Client Changelog
 
+## v0.5.3
+
+- Resolved issue with parsing NovaSeq RTA version (v3...)
+
 ## v0.5.2
 
 - Supporting data generator by relaxing BCL file name pattern.
