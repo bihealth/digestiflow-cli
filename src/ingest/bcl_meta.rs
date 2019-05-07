@@ -63,7 +63,7 @@ pub fn guess_folder_layout(path: &Path) -> Result<FolderLayout> {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Eq)]
 pub struct ReadDescription {
     pub number: i32,
     pub num_cycles: i32,
@@ -279,6 +279,7 @@ pub fn process_xml_param_doc_miniseq(info_doc: &Document) -> Result<RunParameter
                 num_cycles: num_cycles,
                 is_index: true,
             });
+            number += 1;
         }
     }
 

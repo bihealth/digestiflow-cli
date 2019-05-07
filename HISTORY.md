@@ -1,5 +1,9 @@
 # Digestiflow CLI Client Changelog
 
+## v0.5.4
+
+- Fixed problem with erroneously flagging successful runs as failed.
+
 ## v0.5.3
 
 - Resolved issue with parsing NovaSeq RTA version (v3...)
