@@ -177,7 +177,7 @@ impl Settings {
                 if m.is_present("quiet") {
                     s.set("quiet", true)?;
                 }
-                if m.is_present("quiet") {
+                if m.is_present("verbose") {
                     s.set("verbose", true)?;
                 }
                 if m.is_present("log_token") {

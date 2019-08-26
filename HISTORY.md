@@ -1,5 +1,9 @@
 # Digestiflow CLI Client Changelog
 
+## HEAD (unreleased)
+
+- Fixing meaning of `--verbose` parameter.
+
 ## v0.5.4
 
 - Fixed problem with erroneously flagging successful runs as failed.
