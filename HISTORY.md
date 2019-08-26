@@ -4,6 +4,7 @@
 
 - Adding `--dry-run` parameter.
 - Fixing meaning of `--verbose` parameter.
+- Fixing import of MiSeq flow cells.
 
 ## v0.5.4
 

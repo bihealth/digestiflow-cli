@@ -91,8 +91,8 @@ pub struct RunInfo {
 }
 
 pub fn process_xml_run_info(info_doc: &Document) -> Result<RunInfo> {
-    let reads = if let Value::Nodeset(nodeset) =
-        evaluate_xpath(&info_doc, "//Read").chain_err(|| "Problem finding Read tags")?
+    let reads = if let Value::Nodeset(nodeset) = evaluate_xpath(&info_doc, "//RunInfoRead")
+        .chain_err(|| "Problem finding RunInfoRead tags")?
     {
         let mut reads = Vec::new();
         for node in nodeset.document_order() {
@@ -231,7 +231,12 @@ pub fn process_xml_param_doc_miseq(info_doc: &Document) -> Result<RunParameters>
             .chain_err(|| "Problem getting ScanNumber element")?
             .into_number() as i32,
         flowcell_slot: if let Ok(elem) = evaluate_xpath(&info_doc, "//FCPosition/text()") {
-            elem.into_string()
+            let elem = elem.into_string();
+            if elem.is_empty() {
+                "A".to_string()
+            } else {
+                elem
+            }
         } else {
             "A".to_string()
         },
