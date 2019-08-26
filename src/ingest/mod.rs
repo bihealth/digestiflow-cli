@@ -198,7 +198,9 @@ fn analyze_adapters(
                 )?;
 
                 // Push results to API
-                if settings.ingest.post_adapters {
+                if settings.dry_run {
+                    info!(logger, "Dry run mode active, not updating adapters.",);
+                } else if settings.ingest.post_adapters {
                     info!(
                         logger,
                         "Updating adapter information via API {:?}", &flowcell
@@ -298,6 +300,9 @@ fn process_folder(
     // Process the XML files.
     let (run_info, run_params) = process_xml(logger, folder_layout, &info_doc, &param_doc)?;
 
+    debug!(logger, "Run info is {:?}", &run_info);
+    debug!(logger, "Run params is {:?}", &run_params);
+
     // Try to get the flow cell information from API.
     debug!(logger, "Connecting to \"{}\"", &settings.web.url);
     if settings.log_token {
@@ -323,7 +328,10 @@ fn process_folder(
                     if flowcell.status_sequencing != "initial"
                         && flowcell.status_sequencing != "in_progress"
                     {
-                        if settings.ingest.skip_if_status_final {
+                        if settings.dry_run {
+                            info!(logger, "Dry running activated, not updating flow cell.",);
+                            flowcell
+                        } else if settings.ingest.skip_if_status_final {
                             info!(
                                 logger,
                                 "Flowcell has a final sequencing status ({:?}), skippping",
@@ -358,7 +366,10 @@ fn process_folder(
             }
             Err(restson::Error::HttpError(404, _msg)) => {
                 debug!(logger, "Flow cell was not found!");
-                if settings.ingest.register {
+                if settings.dry_run {
+                    info!(logger, "Dry run mode activated. Not registering.");
+                    return Ok(());
+                } else if settings.ingest.register {
                     let flowcell = register_flowcell(
                         logger,
                         client,

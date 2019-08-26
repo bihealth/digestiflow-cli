@@ -93,6 +93,8 @@ pub struct Settings {
     pub log_token: bool,
     /// Configuration regarding Digestiflow Web.
     pub web: Web,
+    /// If activated, do not perform any modifying operations.
+    pub dry_run: bool,
     /// Arguments to the `ingest` command.
     pub ingest: IngestArgs,
 }
@@ -109,6 +111,7 @@ impl Default for Settings {
             ingest: IngestArgs::default(),
             seed: 42,
             log_token: false,
+            dry_run: false,
         };
     }
 }
@@ -129,6 +132,7 @@ impl Settings {
         s.set_default("debug", default.debug)?
             .set_default("verbose", default.verbose)?
             .set_default("quiet", default.quiet)?
+            .set_default("dry_run", default.dry_run)?
             .set_default("threads", default.threads as i64)?
             .set_default("seed", default.seed as i64)?
             .set_default("log_token", default.log_token)?
@@ -179,6 +183,9 @@ impl Settings {
                 }
                 if m.is_present("verbose") {
                     s.set("verbose", true)?;
+                }
+                if m.is_present("dry_run") {
+                    s.set("dry_run", true)?;
                 }
                 if m.is_present("log_token") {
                     s.set("log_token", true)?;

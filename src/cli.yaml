@@ -1,5 +1,5 @@
 name: digestiflow-cli
-version: 0.5.1
+version: 0.5.4
 about: CLI Client for Digestiflow
 author: Manuel Holtgrewe <manuel.holtgrewe@bihealth.de>
 settings:
@@ -25,6 +25,12 @@ args:
     takes_value: false
     global: true
     help: Decrease verbosity
+- dry_run:
+    long: dry-run
+    short: n
+    takes_value: false
+    global: true
+    help: Do not perform any modifying operations
 - threads:
     long: threads
     short: t

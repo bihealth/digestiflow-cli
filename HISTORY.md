@@ -2,6 +2,7 @@
 
 ## HEAD (unreleased)
 
+- Adding `--dry-run` parameter.
 - Fixing meaning of `--verbose` parameter.
 
 ## v0.5.4
