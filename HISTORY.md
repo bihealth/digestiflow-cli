@@ -1,6 +1,6 @@
 # Digestiflow CLI Client Changelog
 
-## HEAD (unreleased)
+## v0.5.5
 
 - Adding `--dry-run` parameter.
 - Fixing meaning of `--verbose` parameter.
