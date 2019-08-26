@@ -91,8 +91,9 @@ pub struct RunInfo {
 }
 
 pub fn process_xml_run_info(info_doc: &Document) -> Result<RunInfo> {
-    let reads = if let Value::Nodeset(nodeset) = evaluate_xpath(&info_doc, "//RunInfoRead")
-        .chain_err(|| "Problem finding RunInfoRead tags")?
+    let reads = if let Value::Nodeset(nodeset) =
+        evaluate_xpath(&info_doc, "//RunInfoRead|//Read")
+            .chain_err(|| "Problem finding Read or RunInfoRead tags")?
     {
         let mut reads = Vec::new();
         for node in nodeset.document_order() {
@@ -127,7 +128,7 @@ pub fn process_xml_run_info(info_doc: &Document) -> Result<RunInfo> {
         }
         reads
     } else {
-        bail!("Problem getting Read elements")
+        bail!("Problem getting Read or RunInfoRead elements")
     };
 
     let xml_date = evaluate_xpath(&info_doc, "//Date/text()")
@@ -175,7 +176,8 @@ pub struct RunParameters {
 
 pub fn process_xml_param_doc_miseq(info_doc: &Document) -> Result<RunParameters> {
     let reads = if let Value::Nodeset(nodeset) =
-        evaluate_xpath(&info_doc, "//Read").chain_err(|| "Problem finding Read tags")?
+        evaluate_xpath(&info_doc, "//RunInfoRead|//Read")
+            .chain_err(|| "Problem finding Read or RunInfoRead tags")?
     {
         let mut reads = Vec::new();
         for node in nodeset.document_order() {
@@ -205,12 +207,12 @@ pub fn process_xml_param_doc_miseq(info_doc: &Document) -> Result<RunParameters>
                     })
                 }
             } else {
-                bail!("Read was not a tag!")
+                bail!("Read or RunInfoRead was not a tag!")
             }
         }
         reads
     } else {
-        bail!("Problem getting Read elements")
+        bail!("Problem getting Read or RunInfoRead elements")
     };
 
     let rta_version = evaluate_xpath(&info_doc, "//RTAVersion/text()")
@@ -356,7 +358,8 @@ pub fn get_status_sequencing(
 ) -> String {
     if current_status == "closed" || current_status == "failed" || current_status == "complete" {
         return current_status.to_string();
-    } else if run_info.reads != run_params.planned_reads {
+    } else if (!run_params.planned_reads.is_empty()) && (run_info.reads != run_params.planned_reads)
+    {
         return "failed".to_string();
     } else if path.join("RTAComplete.txt").exists() {
         return "complete".to_string();

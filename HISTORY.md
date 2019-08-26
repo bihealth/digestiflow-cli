@@ -1,5 +1,9 @@
 # Digestiflow CLI Client Changelog
 
+## v0.5.6
+
+- Fixing planned read parsing for MiSeq.
+
 ## v0.5.5
 
 - Adding `--dry-run` parameter.
