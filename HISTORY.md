@@ -1,6 +1,6 @@
 # Digestiflow CLI Client Changelog
 
-## HEAD (unreleased)
+## v0.5.7
 
 - Fixing NovaSeq detection in case of surface 2 only.
 
