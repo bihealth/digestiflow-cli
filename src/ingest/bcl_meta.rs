@@ -40,17 +40,25 @@ pub fn guess_folder_layout(path: &Path) -> Result<FolderLayout> {
         path.join("Data").join("Intensities").join("s.locs"),
         path.join("RunParameters.xml"),
     ];
-    let novaseq_marker = vec![
+    let novaseq_marker_any = vec![
         path.join("Data")
             .join("Intensities")
             .join("BaseCalls")
             .join("L001")
             .join("C1.1")
             .join("L001_1.cbcl"),
-        path.join("RunParameters.xml"),
+        path.join("Data")
+            .join("Intensities")
+            .join("BaseCalls")
+            .join("L001")
+            .join("C1.1")
+            .join("L001_2.cbcl"),
     ];
+    let novaseq_marker_all = vec![path.join("RunParameters.xml")];
 
-    if novaseq_marker.iter().all(|ref m| m.exists()) {
+    if novaseq_marker_all.iter().all(|ref m| m.exists())
+        && novaseq_marker_any.iter().any(|ref m| m.exists())
+    {
         Ok(FolderLayout::NovaSeq)
     } else if miseq_marker.iter().all(|ref m| m.exists()) {
         Ok(FolderLayout::MiSeq)

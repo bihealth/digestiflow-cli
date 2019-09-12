@@ -1,5 +1,9 @@
 # Digestiflow CLI Client Changelog
 
+## HEAD (unreleased)
+
+- Fixing NovaSeq detection in case of surface 2 only.
+
 ## v0.5.6
 
 - Fixing planned read parsing for MiSeq.
