@@ -78,14 +78,39 @@ fn register_flowcell(
     let args = api::ProjectArgs {
         project_uuid: settings.ingest.project_uuid.clone(),
     };
-    let flowcell = client
+    let api_flowcell: api::FlowCell = client
         .post_capture(&args, &flowcell)
         .chain_err(|| "Problem registering data")?;
     debug!(logger, "Registered flowcell: {:?}", &flowcell);
 
+    if flowcell.status_sequencing == "failed" {
+        if let Some(flowcell_uuid) = api_flowcell.sodar_uuid.clone() {
+            debug!(
+                logger,
+                "Posting message about reasons for flow cell failure."
+            );
+            let args = api::ProjectFlowcellArgs {
+                project_uuid: settings.ingest.project_uuid.clone(),
+                flowcell_uuid: flowcell_uuid,
+            };
+            let message = api::FlowCellMessage {
+                subject: Some("Registered flow cell as \"failed\"".to_string()),
+                body: "The main reason for this is presence of the RTAComplete.txt file but the \
+                       indication of performed and planned cycles differ."
+                    .to_string(),
+                state: "sent".to_string(),
+            };
+            client
+                .post(&args, &message)
+                .chain_err(|| "Problem posting message")?;
+        } else {
+            debug!(logger, "Flow cell has no UUID, cannot post message.");
+        }
+    }
+
     info!(logger, "Done registering flow cell.");
 
-    Ok(flowcell)
+    Ok(api_flowcell)
 }
 
 /// Register an existing flow cell with the REST API given the information in `run_info` and `run_params`.
@@ -100,30 +125,58 @@ fn update_flowcell(
 ) -> Result<api::FlowCell> {
     info!(logger, "Updating flow cell...");
 
-    let rebuilt = build_flow_cell(
+    let rebuilt_flowcell = build_flow_cell(
         run_info,
         run_params,
         path,
         Some(flowcell.status_sequencing.clone()),
         settings,
     );
+    debug!(logger, "Rebuilt flowcell is {:?}", &rebuilt_flowcell);
 
-    let flowcell = api::FlowCell {
-        planned_reads: rebuilt.planned_reads.clone(),
-        current_reads: rebuilt.current_reads.clone(),
-        status_sequencing: rebuilt.status_sequencing.clone(),
+    let updated_flowcell = api::FlowCell {
+        planned_reads: rebuilt_flowcell.planned_reads.clone(),
+        current_reads: rebuilt_flowcell.current_reads.clone(),
+        status_sequencing: rebuilt_flowcell.status_sequencing.clone(),
         ..flowcell.clone()
     };
     info!(logger, "Updating flow cell via API");
-    debug!(logger, "  {:?} => {:?}", &flowcell, &rebuilt);
+    debug!(
+        logger,
+        "  {:?} => {:?}", &updated_flowcell, &rebuilt_flowcell
+    );
 
     let args = api::ProjectFlowcellArgs {
         project_uuid: settings.ingest.project_uuid.clone(),
-        flowcell_uuid: flowcell.sodar_uuid.clone().unwrap(),
+        flowcell_uuid: updated_flowcell.sodar_uuid.clone().unwrap(),
     };
-    client
-        .put_capture(&args, &flowcell)
-        .chain_err(|| "Problem updating")
+    let api_flowcell = client
+        .put_capture(&args, &updated_flowcell)
+        .chain_err(|| "Problem updating")?;
+
+    if flowcell.status_sequencing == "failed" && updated_flowcell.status_sequencing == "complete" {
+        if let Some(flowcell_uuid) = updated_flowcell.sodar_uuid.clone() {
+            debug!(logger, "Post message about un-marking as failed.");
+            let args = api::ProjectFlowcellArgs {
+                project_uuid: settings.ingest.project_uuid.clone(),
+                flowcell_uuid: flowcell_uuid,
+            };
+            let message = api::FlowCellMessage {
+                subject: Some("Flow cell not \"failed\" any more".to_string()),
+                body: "Everything looks good now.  Flow cell is marked as complete now and the \
+                       automated client will not update the state any more."
+                    .to_string(),
+                state: "sent".to_string(),
+            };
+            client
+                .post(&args, &message)
+                .chain_err(|| "Problem posting message")?;
+        } else {
+            debug!(logger, "Flow cell has no UUID, cannot post message.");
+        }
+    }
+
+    Ok(api_flowcell)
 }
 
 /// Kick of analyzing the adatpers and then update through API if configured to do so in `settings`.
@@ -327,6 +380,8 @@ fn process_folder(
                 if settings.ingest.update {
                     if flowcell.status_sequencing != "initial"
                         && flowcell.status_sequencing != "in_progress"
+                        // try to recover from not yet confirmed failure
+                        && flowcell.status_sequencing != "failed"
                     {
                         if settings.dry_run {
                             info!(logger, "Dry running activated, not updating flow cell.",);

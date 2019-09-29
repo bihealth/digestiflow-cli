@@ -1,5 +1,9 @@
 # Digestiflow CLI Client Changelog
 
+## v0.5.8
+
+- Allowing "failed" flowcell to become complete to take care of some corner cases.
+
 ## v0.5.7
 
 - Fixing NovaSeq detection in case of surface 2 only.

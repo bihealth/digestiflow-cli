@@ -364,7 +364,8 @@ pub fn get_status_sequencing(
     path: &Path,
     current_status: &str,
 ) -> String {
-    if current_status == "closed" || current_status == "failed" || current_status == "complete" {
+    if current_status == "closed" || current_status == "complete" {
+        // has final status
         return current_status.to_string();
     } else if (!run_params.planned_reads.is_empty()) && (run_info.reads != run_params.planned_reads)
     {

@@ -106,3 +106,20 @@ impl<'a> RestPath<&'a ProjectFlowcellArgs> for LaneIndexHistogramArray {
         ))
     }
 }
+
+/// Adding flow cell message.
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct FlowCellMessage {
+    pub subject: Option<String>,
+    pub body: String,
+    pub state: String,
+}
+
+impl<'a> RestPath<&'a ProjectFlowcellArgs> for FlowCellMessage {
+    fn get_path(args: &'a ProjectFlowcellArgs) -> result::Result<String, restson::Error> {
+        Ok(format!(
+            "api/messages/{}/{}/",
+            &args.project_uuid, &args.flowcell_uuid
+        ))
+    }
+}
