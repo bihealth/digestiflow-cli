@@ -358,8 +358,8 @@ pub fn process_xml(
     debug!(logger, "RunInfo => {:?}", &run_info);
 
     let run_params = match folder_layout {
-        FolderLayout::MiSeqDep => process_xml_param_doc_miseqdep(param_doc)?,
-        FolderLayout::MiniSeq | FolderLayout:: MiSeq | FolderLayout::NovaSeq => process_xml_param_doc_miniseq(param_doc)?,
+        FolderLayout::MiSeqDep | FolderLayout:: MiSeq => process_xml_param_doc_miseqdep(param_doc)?,
+        FolderLayout::MiniSeq | FolderLayout::NovaSeq => process_xml_param_doc_miniseq(param_doc)?,
         _ => bail!(
             "Don't yet know how to parse folder layout {:?}",
             folder_layout
