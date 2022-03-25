@@ -194,7 +194,7 @@ pub struct RunParameters {
     pub experiment_name: String,
 }
 
-pub fn process_xml_param_doc_miseqdep(info_doc: &Document) -> Result<RunParameters> {
+pub fn process_xml_param_doc_miseq(info_doc: &Document) -> Result<RunParameters> {
     let reads = if let Value::Nodeset(nodeset) =
         evaluate_xpath(&info_doc, "//RunInfoRead|//Read")
             .chain_err(|| "Problem finding Read or RunInfoRead tags")?
@@ -358,7 +358,7 @@ pub fn process_xml(
     debug!(logger, "RunInfo => {:?}", &run_info);
 
     let run_params = match folder_layout {
-        FolderLayout::MiSeqDep | FolderLayout:: MiSeq => process_xml_param_doc_miseqdep(param_doc)?,
+        FolderLayout::MiSeqDep | FolderLayout:: MiSeq => process_xml_param_doc_miseq(param_doc)?,
         FolderLayout::MiniSeq | FolderLayout::NovaSeq => process_xml_param_doc_miniseq(param_doc)?,
         _ => bail!(
             "Don't yet know how to parse folder layout {:?}",
