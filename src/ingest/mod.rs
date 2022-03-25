@@ -336,7 +336,8 @@ fn process_folder(
 
     let param_pkg = {
         let filename = match folder_layout {
-            FolderLayout::MiSeq => "runParameters.xml",
+            FolderLayout::MiSeqDep => "runParameters.xml",
+            FolderLayout::MiSeq => "RunParameters.xml",
             FolderLayout::MiniSeq => "RunParameters.xml",
             FolderLayout::HiSeqX => "RunParameters.xml",
             FolderLayout::NovaSeq => "RunParameters.xml",

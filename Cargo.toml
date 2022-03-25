@@ -1,7 +1,7 @@
 [package]
 name = "digestiflow-cli"
-version = "0.5.7"
-authors = ["Manuel Holtgrewe <manuel.holtgrewe@bihealth.de>"]
+version = "0.5.9"
+authors = ["Manuel Holtgrewe <manuel.holtgrewe@bih-charite.de>", "Marten Jäger <marten.jaeger@bih-charite.de>"]
 
 [dependencies]
 # Elegant error handling
