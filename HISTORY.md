@@ -1,5 +1,9 @@
 # Digestiflow CLI Client Changelog
 
+## v0.5.9
+
+- Adding fix for new Windows10 bases MiSeq output
+
 ## v0.5.8
 
 - Allowing "failed" flowcell to become complete to take care of some corner cases.
