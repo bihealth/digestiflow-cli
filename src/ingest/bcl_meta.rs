@@ -339,7 +339,17 @@ pub fn process_xml_param_doc_miniseq(info_doc: &Document) -> Result<RunParameter
         run_number: evaluate_xpath(&info_doc, "//RunNumber/text()")
             .chain_err(|| "Problem getting RunNumber element")?
             .into_number() as i32,
-        flowcell_slot: "A".to_string(), // always Slot A
+        flowcell_slot: if let Ok(elem) = evaluate_xpath(&info_doc, "//Side/text()") {
+            let elem = elem.into_string();
+            if elem.is_empty() {
+                "A".to_string()
+            } else {
+                elem
+            }
+        } else {
+            "A".to_string()
+        },
+
         experiment_name: if let Ok(elem) = evaluate_xpath(&info_doc, "//ExperimentName/text()") {
             elem.into_string()
         } else {
