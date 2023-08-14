@@ -1,7 +1,7 @@
 name: digestiflow-cli
-version: 0.5.7
+version: 0.5.11
 about: CLI Client for Digestiflow
-author: Manuel Holtgrewe <manuel.holtgrewe@bihealth.de>
+author: Manuel Holtgrewe <manuel.holtgrewe@bih-charite.de>, Marten Jäger <marten.jaeger@bih-charite.de>
 settings:
 - SubcommandRequiredElseHelp
 - ColorAuto

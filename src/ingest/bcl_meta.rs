@@ -10,23 +10,33 @@ use super::super::errors::*;
 
 #[derive(PartialEq, Eq, Debug, Copy, Clone)]
 pub enum FolderLayout {
-    /// MiSeq, HiSeq 2000, etc. `runParameters.xml`
-    MiSeq,
+    /// MiSeq (Windows XP), HiSeq 2000, etc. `runParameters.xml`
+    MiSeqDep,
     /// MiniSeq, NextSeq etc. `RunParameters.xml`
     MiniSeq,
     /// HiSeq X
     HiSeqX,
     /// NovaSeq
     NovaSeq,
+    /// MiSeq (Windows 10)
+    MiSeq
 }
 
 pub fn guess_folder_layout(path: &Path) -> Result<FolderLayout> {
-    let miniseq_markers = vec![
+    let miniseq_marker = vec![
         path.join("Data")
             .join("Intensities")
             .join("BaseCalls")
             .join("L001"),
         path.join("RunParameters.xml"),
+    ];
+    let miseqdep_marker = vec![
+        path.join("Data")
+            .join("Intensities")
+            .join("BaseCalls")
+            .join("L001")
+            .join("C1.1"),
+        path.join("runParameters.xml"),
     ];
     let miseq_marker = vec![
         path.join("Data")
@@ -34,7 +44,7 @@ pub fn guess_folder_layout(path: &Path) -> Result<FolderLayout> {
             .join("BaseCalls")
             .join("L001")
             .join("C1.1"),
-        path.join("runParameters.xml"),
+        path.join("RunParameters.xml"),
     ];
     let hiseqx_marker = vec![
         path.join("Data").join("Intensities").join("s.locs"),
@@ -60,9 +70,11 @@ pub fn guess_folder_layout(path: &Path) -> Result<FolderLayout> {
         && novaseq_marker_any.iter().any(|ref m| m.exists())
     {
         Ok(FolderLayout::NovaSeq)
+    } else if miseqdep_marker.iter().all(|ref m| m.exists()) {
+        Ok(FolderLayout::MiSeqDep)
     } else if miseq_marker.iter().all(|ref m| m.exists()) {
         Ok(FolderLayout::MiSeq)
-    } else if miniseq_markers.iter().all(|ref m| m.exists()) {
+    } else if miniseq_marker.iter().all(|ref m| m.exists()) {
         Ok(FolderLayout::MiniSeq)
     } else if hiseqx_marker.iter().all(|ref m| m.exists()) {
         Ok(FolderLayout::HiSeqX)
@@ -327,7 +339,17 @@ pub fn process_xml_param_doc_miniseq(info_doc: &Document) -> Result<RunParameter
         run_number: evaluate_xpath(&info_doc, "//RunNumber/text()")
             .chain_err(|| "Problem getting RunNumber element")?
             .into_number() as i32,
-        flowcell_slot: "A".to_string(), // always Slot A
+        flowcell_slot: if let Ok(elem) = evaluate_xpath(&info_doc, "//Side/text()") {
+            let elem = elem.into_string();
+            if elem.is_empty() {
+                "A".to_string()
+            } else {
+                elem
+            }
+        } else {
+            "A".to_string()
+        },
+
         experiment_name: if let Ok(elem) = evaluate_xpath(&info_doc, "//ExperimentName/text()") {
             elem.into_string()
         } else {
@@ -346,7 +368,7 @@ pub fn process_xml(
     debug!(logger, "RunInfo => {:?}", &run_info);
 
     let run_params = match folder_layout {
-        FolderLayout::MiSeq => process_xml_param_doc_miseq(param_doc)?,
+        FolderLayout::MiSeqDep | FolderLayout:: MiSeq => process_xml_param_doc_miseq(param_doc)?,
         FolderLayout::MiniSeq | FolderLayout::NovaSeq => process_xml_param_doc_miniseq(param_doc)?,
         _ => bail!(
             "Don't yet know how to parse folder layout {:?}",
